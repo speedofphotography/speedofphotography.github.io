@@ -560,9 +560,22 @@ content:
   format: yaml
   fields:
   - name: spots
-    label: Extra recommended locations (just names, one per line item)
+    label: Extra recommended locations
+    type: object
+    list:
+      collapsible:
+        collapsed: false
+        summary: '{name}'
+    fields:
+    - name: name
+      label: Location name
+      type: string
+    - name: map_link
+      label: Google Maps link (if blank, it searches Maps for the name)
+      type: string
+  - name: map_button
+    label: Extra locations card - map link text
     type: string
-    list: true
   - name: list_tag
     label: Extra locations card - small tag
     type: string

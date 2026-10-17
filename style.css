@@ -918,6 +918,17 @@ h1, h2, h3 {
   position: relative;
 }
 .spot-list li:last-child { border-bottom: 0; }
+.spot-list a { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; color: var(--text); }
+.spot-map {
+  flex-shrink: 0;
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--accent);
+}
+.spot-list a:hover .spot-map { color: #fff; }
 .spot-list li::before {
   content: "";
   position: absolute;
