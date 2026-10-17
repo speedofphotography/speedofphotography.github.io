@@ -1,7 +1,13 @@
+spots:
+  - name: Pine Hollow Trailhead
+    map_link: https://maps.app.goo.gl/UuABupJGtvii5cTX6
+  - name: Little Valley Trailhead
+    map_link: https://maps.app.goo.gl/oUet955gis7KESAR9
+  - name: American Fork Marina
+    map_link: https://maps.app.goo.gl/jwrEip3ggvH2i4Eq9
+map_button: Map
 list_tag: More spots
 list_heading: Other places I recommend
-spots: []
-map_button: Map
 suggest_tag: Your pick
 suggest_heading: Suggest your own location!
 suggest_text: Know a spot that would make a great backdrop? Send it my way.
