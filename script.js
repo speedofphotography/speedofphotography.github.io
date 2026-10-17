@@ -203,6 +203,23 @@ if ("IntersectionObserver" in window) {
   });
 }
 
+// ---------- Location cards: one sideways-scrolling row with arrow buttons ----------
+document.querySelectorAll(".locations-scroller").forEach((wrap) => {
+  const row = wrap.querySelector(".locations");
+  const prev = wrap.querySelector(".locations-arrow.prev");
+  const next = wrap.querySelector(".locations-arrow.next");
+  const step = () => (row.querySelector(".location")?.offsetWidth || row.clientWidth) + 16;
+  const update = () => {
+    prev.hidden = row.scrollLeft <= 4;
+    next.hidden = row.scrollLeft + row.clientWidth >= row.scrollWidth - 4;
+  };
+  prev.addEventListener("click", () => row.scrollBy({ left: -step() }));
+  next.addEventListener("click", () => row.scrollBy({ left: step() }));
+  row.addEventListener("scroll", update, { passive: true });
+  window.addEventListener("resize", update);
+  update();
+});
+
 // ---------- Location photo switcher ----------
 document.querySelectorAll(".location-media").forEach((media) => {
   const main = media.querySelector(".location-photo");

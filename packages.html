@@ -81,7 +81,9 @@ permalink: /packages/
         <h2 id="locations-heading">{{ lc.heading | escape }}</h2>
         <p class="section-sub">{{ lc.intro | escape }}</p>
       </div>
-      <div class="locations">
+      <div class="locations-scroller">
+      <button type="button" class="locations-arrow prev" aria-label="Scroll locations left" hidden>&#8249;</button>
+      <div class="locations" tabindex="0" aria-label="Recommended locations, scroll sideways for more">
         {%- for pl in lc.places %}
         {%- if pl.name and pl.name != "" %}
         <article class="location">
@@ -161,6 +163,8 @@ permalink: /packages/
           </form>
         </article>
         {%- endif %}
+      </div>
+      <button type="button" class="locations-arrow next" aria-label="Scroll locations right" hidden>&#8250;</button>
       </div>
     </section>
     {%- endif %}

@@ -820,14 +820,25 @@ h1, h2, h3 {
 }
 
 /* ---------- Recommended locations (Packages page) ---------- */
+/* All cards sit in one row that scrolls sideways (swipe, trackpad, or the arrow buttons) */
+.locations-scroller { position: relative; }
 .locations {
   display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
   gap: 16px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scroll-behavior: smooth;
+  overscroll-behavior-x: contain;
+  padding: 6px 2px 14px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--accent) transparent;
 }
+.locations::-webkit-scrollbar { height: 6px; }
+.locations::-webkit-scrollbar-thumb { background: var(--accent); border-radius: 3px; }
+.locations:focus-visible { outline: 1px solid var(--accent); outline-offset: 4px; }
 .location {
-  flex: 0 1 calc((100% - 32px) / 3);
+  flex: 0 0 calc((100% - 32px) / 3);
+  scroll-snap-align: start;
   display: flex;
   flex-direction: column;
   background: var(--surface);
@@ -866,11 +877,32 @@ h1, h2, h3 {
 }
 .location-map:hover { color: #fff; }
 
+.locations-arrow {
+  position: absolute;
+  top: 40%;
+  z-index: 2;
+  width: 44px;
+  height: 44px;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: rgba(10, 10, 12, 0.85);
+  color: var(--text);
+  font-size: 1.8rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: border-color 0.2s, color 0.2s;
+}
+.locations-arrow:hover { border-color: var(--accent); color: var(--accent); }
+.locations-arrow.prev { left: -22px; }
+.locations-arrow.next { right: -22px; }
+
 @media (max-width: 960px) {
   .location { flex-basis: calc((100% - 16px) / 2); }
 }
 @media (max-width: 760px) {
-  .location { flex-basis: 100%; }
+  /* Show a sliver of the next card so it's clear the row scrolls */
+  .location { flex-basis: 85%; }
+  .locations-arrow { display: none; }
 }
 
 /* Location photo switcher (main photo + seasonal thumbnails with credits) */
