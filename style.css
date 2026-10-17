@@ -910,6 +910,57 @@ h1, h2, h3 {
 .location-credit { color: var(--muted); text-decoration: underline; }
 .location-credit:hover { color: var(--text); }
 
+/* Extra spots list + "Suggest your own location" card */
+.spot-list { list-style: none; margin: 4px 0 0; padding: 0; }
+.spot-list li {
+  padding: 10px 0 10px 18px;
+  border-bottom: 1px solid var(--line);
+  position: relative;
+}
+.spot-list li:last-child { border-bottom: 0; }
+.spot-list li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 50%;
+  width: 6px;
+  height: 6px;
+  margin-top: -3px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+.location-suggest { border-style: dashed; border-color: var(--accent); }
+.suggest-form { gap: 12px; }
+.suggest-form h3, .suggest-form p { margin-bottom: 0; }
+.suggest-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-family: var(--display);
+  font-weight: 500;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  color: var(--muted);
+}
+.suggest-form input, .suggest-form textarea {
+  width: 100%;
+  padding: 10px 12px;
+  font: inherit;
+  font-family: var(--body, inherit);
+  text-transform: none;
+  letter-spacing: normal;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  transition: border-color 0.2s;
+}
+.suggest-form textarea { resize: vertical; }
+.suggest-form input:focus, .suggest-form textarea:focus { outline: none; border-color: var(--accent); }
+.suggest-form .btn { align-self: flex-start; margin-top: 4px; }
+.suggest-form .btn:disabled { opacity: 0.6; cursor: wait; transform: none; }
+
 /* ---------- UTMedia page ---------- */
 .page-tagline {
   margin: 14px 0 0;

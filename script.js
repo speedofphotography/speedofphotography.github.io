@@ -268,3 +268,54 @@ if (utmForm) {
     }
   });
 }
+
+// ---------- "Suggest your own location" card (emailed via FormSubmit, like bookings) ----------
+const suggestForm = document.getElementById("suggest-form");
+if (suggestForm) {
+  const btn = suggestForm.querySelector('button[type="submit"]');
+  const status = suggestForm.querySelector(".form-status");
+  suggestForm.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const data = new FormData(suggestForm);
+    if (data.get("_honey")) return; // filled in by spam bots only
+    const ds = suggestForm.dataset;
+    const loc = (data.get("location") || "").trim();
+    const payload = {
+      location: loc,
+      details: (data.get("why") || "").trim() || "None",
+      suggested_by: (data.get("from") || "").trim() || "Not given",
+      _subject: `${ds.subject}: ${loc}`,
+      _template: "table",
+    };
+    btn.disabled = true;
+    btn.textContent = ds.sending;
+    status.className = "form-status";
+    status.textContent = "";
+    try {
+      const res = await fetch(`https://formsubmit.co/ajax/${ds.email}`, {
+        method: "POST",
+        referrerPolicy: "origin", // one FormSubmit activation covers every page
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const result = await res.json().catch(() => ({}));
+      if (!res.ok || String(result.success) === "false") throw new Error(result.message || res.statusText);
+      suggestForm.reset();
+      status.className = "form-status is-success";
+      status.textContent = ds.success;
+    } catch (err) {
+      const body = `Location: ${payload.location}
+Details: ${payload.details}
+Suggested by: ${payload.suggested_by}`;
+      status.className = "form-status is-error";
+      status.textContent = ds.error + " ";
+      const link = document.createElement("a");
+      link.href = `mailto:${ds.email}?subject=${encodeURIComponent(payload._subject)}&body=${encodeURIComponent(body)}`;
+      link.textContent = ds.errorLink;
+      status.append(link);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = btn.dataset.label;
+    }
+  });
+}

@@ -1,0 +1,17 @@
+list_tag: More spots
+list_heading: Other places I recommend
+spots: []
+suggest_tag: Your pick
+suggest_heading: Suggest your own location!
+suggest_text: Know a spot that would make a great backdrop? Send it my way.
+location_label: Location
+location_placeholder: Name or address
+why_label: What makes it great? (optional)
+why_placeholder: The vibe, best time of day, anything useful
+from_label: Your name or @ (optional)
+button: Send suggestion
+sending: Sending...
+email_subject: Location suggestion
+success: Thanks! Your suggestion was sent.
+error: Something went wrong sending that.
+error_link: Email it instead

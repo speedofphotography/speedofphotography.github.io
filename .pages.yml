@@ -553,6 +553,64 @@ content:
       - name: credit_link
         label: Credit link (photo's source page)
         type: string
+- name: more_locations
+  label: More locations & suggestions
+  type: file
+  path: _data/more_locations.yml
+  format: yaml
+  fields:
+  - name: spots
+    label: Extra recommended locations (just names, one per line item)
+    type: string
+    list: true
+  - name: list_tag
+    label: Extra locations card - small tag
+    type: string
+  - name: list_heading
+    label: Extra locations card - heading
+    type: string
+  - name: suggest_tag
+    label: Suggestion card - small tag
+    type: string
+  - name: suggest_heading
+    label: Suggestion card - heading (leave blank to hide the card)
+    type: string
+  - name: suggest_text
+    label: Suggestion card - text
+    type: text
+  - name: location_label
+    label: Location field label
+    type: string
+  - name: location_placeholder
+    label: Location field hint
+    type: string
+  - name: why_label
+    label: Details field label
+    type: string
+  - name: why_placeholder
+    label: Details field hint
+    type: string
+  - name: from_label
+    label: Name field label
+    type: string
+  - name: button
+    label: Button text
+    type: string
+  - name: sending
+    label: Text while sending
+    type: string
+  - name: email_subject
+    label: Subject of the email you receive
+    type: string
+  - name: success
+    label: Message after a successful send
+    type: string
+  - name: error
+    label: Message if sending fails
+    type: string
+  - name: error_link
+    label: Link text to email instead
+    type: string
 - name: utmedia
   label: UTMedia page
   type: file
