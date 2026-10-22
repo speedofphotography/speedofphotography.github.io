@@ -40,6 +40,46 @@ document.querySelectorAll(".filter").forEach((btn) => {
   });
 });
 
+// ---------- Portfolio: staggered (masonry) layout ----------
+// Each photo is shown at its own proportions and dropped into the shortest column. The second
+// column starts a little lower, so the columns are always staggered, even when every photo is the same shape.
+document.querySelectorAll(".gallery.masonry").forEach((grid) => {
+  const ROW = 2; // px per grid row (set in style.css)
+  const items = [...grid.querySelectorAll(".shot")];
+  items.forEach((shot) => { shot.dataset.ratio = shot.classList.contains("tall") ? 2 / 3 : 3 / 2; });
+  const layout = () => {
+    const visible = items.filter((s) => !s.classList.contains("is-hidden"));
+    if (!visible.length) return;
+    const cols = getComputedStyle(grid).gridTemplateColumns.split(" ").length;
+    const gap = parseFloat(getComputedStyle(visible[0]).marginBottom) || 0;
+    const colW = (grid.clientWidth - parseFloat(getComputedStyle(grid).columnGap || 0) * (cols - 1)) / cols;
+    const heights = new Array(cols).fill(0);
+    if (cols > 1) heights[1] = Math.round((colW * 0.75) / ROW); // half a portrait photo
+    visible.forEach((shot) => {
+      const h = colW / shot.dataset.ratio;
+      const span = Math.ceil((h + gap) / ROW);
+      const c = heights.indexOf(Math.min(...heights));
+      shot.style.height = `${h}px`;
+      shot.style.gridColumn = String(c + 1);
+      shot.style.gridRow = `${heights[c] + 1} / span ${span}`;
+      heights[c] += span;
+    });
+  };
+  items.forEach((shot) => {
+    if (!shot.dataset.src) return;
+    const img = new Image();
+    img.onload = () => {
+      shot.dataset.ratio = img.naturalWidth / img.naturalHeight;
+      layout();
+    };
+    img.src = shot.dataset.src;
+  });
+  layout();
+  window.addEventListener("resize", layout);
+  // The filter buttons hide photos first (their handler is added earlier), then the columns are rebuilt.
+  document.querySelectorAll(".filter").forEach((btn) => btn.addEventListener("click", layout));
+});
+
 // ---------- Lightbox ----------
 const lightbox = document.getElementById("lightbox");
 if (lightbox) {
