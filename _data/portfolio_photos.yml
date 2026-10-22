@@ -115,3 +115,23 @@ photos:
     caption: Porsche 911 GT3 RS
     category: static
     size: tall
+  - image: /images/shoei-helmet-smoke.jpg
+    caption: Shoei helmet in the canyon
+    category: details
+    size: tall
+  - image: /images/huracan-performante-wing.jpg
+    caption: Lamborghini Huracán Performante at sunset
+    category: details
+    size: tall
+  - image: /images/porsche-992-carrera-rolling.jpg
+    caption: Porsche 911 Carrera (992) rolling through the canyon
+    category: rolling
+    size: normal
+  - image: /images/porsche-992-carrera-lake.jpg
+    caption: Porsche 911 Carrera (992) by the lake at dusk
+    category: static
+    size: tall
+  - image: /images/singer-badge.jpg
+    caption: Singer badge
+    category: details
+    size: tall
