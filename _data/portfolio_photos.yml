@@ -135,3 +135,11 @@ photos:
     caption: Singer badge
     category: details
     size: tall
+  - image: /images/porsche-992-gt3.jpg
+    caption: Porsche 911 GT3 (992)
+    category: static
+    size: tall
+  - image: /images/aston-martin-badge.jpg
+    caption: Aston Martin wings badge
+    category: details
+    size: tall
