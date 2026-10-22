@@ -95,3 +95,23 @@ photos:
     caption: Lamborghini Countach LPI800-4 Taillight
     category: details
     size: tall
+  - image: /images/lamborghini-countach-meet.jpg
+    caption: Lamborghini Countach LPI 800-4 at a car show
+    category: events
+    size: tall
+  - image: /images/porsche-gt3-rs-canyon.jpg
+    caption: Porsche 911 GT3 RS in the canyon
+    category: static
+    size: tall
+  - image: /images/audi-s3-overlook.jpg
+    caption: Audi S3 at the overlook
+    category: static
+    size: normal
+  - image: /images/gt3-rs-wheel-sportbike.jpg
+    caption: Porsche 911 GT3 RS wheel with a sportbike
+    category: details
+    size: normal
+  - image: /images/porsche-gt3-rs-front.jpg
+    caption: Porsche 911 GT3 RS
+    category: static
+    size: tall
