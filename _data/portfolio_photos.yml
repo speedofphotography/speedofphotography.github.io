@@ -92,47 +92,43 @@ photos:
     category: details
     size: tall
   - image: /images/lamborghini-taillight.jpg
-    caption: Lamborghini Countach LPI800-4 Taillight
+    caption: Lamborghini Countach LPI 800-4 Taillight
     category: details
     size: tall
   - image: /images/lamborghini-countach-meet.jpg
-    caption: Lamborghini Countach LPI 800-4 at a car show
+    caption: Lamborghini Countach LPI 800-4
     category: events
     size: tall
   - image: /images/porsche-gt3-rs-canyon.jpg
-    caption: Porsche 911 GT3 RS in the canyon
-    category: static
-    size: tall
-  - image: /images/audi-s3-overlook.jpg
-    caption: Audi S3 at the overlook
-    category: static
-    size: normal
-  - image: /images/gt3-rs-wheel-sportbike.jpg
-    caption: Porsche 911 GT3 RS wheel with a sportbike
-    category: details
-    size: normal
-  - image: /images/porsche-gt3-rs-front.jpg
     caption: Porsche 911 GT3 RS
     category: static
     size: tall
+  - image: /images/audi-s3-overlook.jpg
+    caption: Audi S3
+    category: static
+    size: normal
+  - image: /images/gt3-rs-wheel-sportbike.jpg
+    caption: Porsche 911 GT3 RS wheel with Kawasaki ZX6R
+    category: details
+    size: normal
   - image: /images/shoei-helmet-smoke.jpg
-    caption: Shoei helmet in the canyon
+    caption: "@nervy.moto helmet"
     category: details
     size: tall
   - image: /images/huracan-performante-wing.jpg
-    caption: Lamborghini Huracán Performante at sunset
+    caption: Lamborghini Huracán with Heffner Twin Turbo kit
     category: details
     size: tall
   - image: /images/porsche-992-carrera-rolling.jpg
-    caption: Porsche 911 Carrera (992) rolling through the canyon
+    caption: Porsche 911 Carrera (992) in American Fork Canyon
     category: rolling
     size: normal
   - image: /images/porsche-992-carrera-lake.jpg
-    caption: Porsche 911 Carrera (992) by the lake at dusk
+    caption: Porsche 911 Carrera (992) at Utah Lake
     category: static
     size: tall
   - image: /images/singer-badge.jpg
-    caption: Singer badge
+    caption: Singer 911 Turbo Reimagined badge
     category: details
     size: tall
   - image: /images/porsche-992-gt3.jpg
@@ -140,6 +136,6 @@ photos:
     category: static
     size: tall
   - image: /images/aston-martin-badge.jpg
-    caption: Aston Martin wings badge
+    caption: Aston Martin Valhalla Badge shot
     category: details
     size: tall
