@@ -38,6 +38,37 @@ layout: default
       </div>
     </section>
 
+    <section id="services" class="section section-alt">
+      <div class="section-head">
+        <p class="eyebrow">{{ c.services.eyebrow | escape }}</p>
+        <h2>{{ c.services.heading | escape }}</h2>
+      </div>
+      <div class="services">
+        {%- for s in c.services.items %}
+        <article class="service">
+          <span class="service-num">{% if forloop.index < 10 %}0{% endif %}{{ forloop.index }}</span>
+          <h3>{{ s.title | escape }}</h3>
+          <p>{{ s.text | escape }}</p>
+        </article>
+        {%- endfor %}
+      </div>
+      <div class="section-cta">
+        <a href="{{ base }}/packages/" class="btn btn-primary">{{ c.packages.home_button | default: "See packages" | escape }}</a>
+      </div>
+    </section>
+
+    <section id="process" class="section">
+      <div class="section-head">
+        <p class="eyebrow">{{ c.process.eyebrow | escape }}</p>
+        <h2>{{ c.process.heading | escape }}</h2>
+      </div>
+      <ol class="process">
+        {%- for s in c.process.steps %}
+        <li><h3>{{ s.title | escape }}</h3><p>{{ s.text | escape }}</p></li>
+        {%- endfor %}
+      </ol>
+    </section>
+
     <section id="work" class="section section-alt">
       <div class="section-head">
         <p class="eyebrow">{{ c.gallery.eyebrow | escape }}</p>
@@ -66,37 +97,6 @@ layout: default
       <div class="section-cta">
         <a href="{{ base }}/portfolio/" class="btn btn-primary">{{ c.portfolio.home_button | default: "View full portfolio" | escape }}</a>
       </div>
-    </section>
-
-    <section id="services" class="section">
-      <div class="section-head">
-        <p class="eyebrow">{{ c.services.eyebrow | escape }}</p>
-        <h2>{{ c.services.heading | escape }}</h2>
-      </div>
-      <div class="services">
-        {%- for s in c.services.items %}
-        <article class="service">
-          <span class="service-num">{% if forloop.index < 10 %}0{% endif %}{{ forloop.index }}</span>
-          <h3>{{ s.title | escape }}</h3>
-          <p>{{ s.text | escape }}</p>
-        </article>
-        {%- endfor %}
-      </div>
-      <div class="section-cta">
-        <a href="{{ base }}/packages/" class="btn btn-primary">{{ c.packages.home_button | default: "See packages" | escape }}</a>
-      </div>
-    </section>
-
-    <section id="process" class="section section-alt">
-      <div class="section-head">
-        <p class="eyebrow">{{ c.process.eyebrow | escape }}</p>
-        <h2>{{ c.process.heading | escape }}</h2>
-      </div>
-      <ol class="process">
-        {%- for s in c.process.steps %}
-        <li><h3>{{ s.title | escape }}</h3><p>{{ s.text | escape }}</p></li>
-        {%- endfor %}
-      </ol>
     </section>
 
 
