@@ -1,7 +1,7 @@
 business_name: Speed Of Photography
 seo_title: Speed Of Photography | Automotive Photography
-seo_description: 'Speed Of Photography: automotive photography for owners, builders, dealerships and events.
-  Rolling shots, studio-style static shoots, details and car meets.'
+seo_description: 'Speed Of Photography: automotive photography specializing in rolling shots and interiors,
+  plus statics, details and car meets for owners, builders, dealerships and events.'
 logo: /images/logo-small.png
 navigation:
   about: About
@@ -12,19 +12,20 @@ navigation:
   email: Email
 hero:
   background: /images/hero-center.jpg
-  eyebrow: Automotive photography
+  eyebrow: Rolling & interior specialist
   title_line_1: Capturing motion,
   title_line_2: even when it's standing still.
-  subtitle: Rolling shots, detail work and editorial-style shoots for owners, shops, dealerships and events.
+  subtitle: I specialize in rolling shots and interiors, with statics, details and events too, for owners,
+    shops, dealerships and meets.
   primary_button: Book a shoot
   secondary_button: See the work
 highlights:
 - title: Rollers
-  text: car-to-car motion shots
-- title: Static
-  text: location & night shoots
-- title: Details
-  text: wheels, interiors, engine bays, the little things that makes your car special
+  text: 'my specialty: car-to-car motion shots'
+- title: Interiors
+  text: 'my specialty: seats, dash, stitching & trim'
+- title: Static & details
+  text: location & night shoots, wheels, engine bays, the little things that make your car special
 - title: Events
   text: meets, shows & track days
 filters:
@@ -51,14 +52,14 @@ services:
   heading: What I shoot
   items:
   - title: Rolling shoots
-    text: Car-to-car motion photography with sharp subjects and blurred backgrounds that make your car
-      look fast standing still.
-  - title: Private commissions
-    text: A dedicated shoot for your car at locations picked to match its character, from city streets
-      at night to open back roads.
-  - title: Shops & dealerships
-    text: Clean, consistent listing and build-showcase photos that sell cars and show off the work that
-      went into them.
+    text: 'My specialty: car-to-car motion photography with sharp subjects and blurred backgrounds that
+      make your car look fast standing still.'
+  - title: Interior shoots
+    text: 'My other specialty: seats, dash, wheel and stitching, lit so the cabin looks as good as it
+      feels. Great for builds and sale listings.'
+  - title: Private & shop shoots
+    text: A dedicated shoot for your car, or clean listing and build-showcase photos for shops and dealerships,
+      at locations picked to match the car.
   - title: Events & meets
     text: Coverage of car meets, shows and track days, delivered fast so you can post while the event
       is still trending.
