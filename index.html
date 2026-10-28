@@ -24,38 +24,6 @@ layout: default
       {%- endfor %}
     </section>
 
-    {%- comment %} Specialties (rolling + interiors) live in _data/specialties.yml (Pages CMS: "Specialties"). {% endcomment %}
-    {%- assign sp = site.data.specialties %}
-    {%- if sp.items.size > 0 %}
-    <section id="specialties" class="section specialties" aria-label="{{ sp.heading | default: 'Specialties' | escape }}">
-      {%- for f in sp.items %}
-      {%- if f.heading and f.heading != "" %}
-      <div class="feat{% cycle '', ' rev' %}">
-        <div class="feat-media">
-          {%- if f.photo_main and f.photo_main != "" %}<div class="feat-photo" style="--img:url('{{ base }}{{ f.photo_main }}')"></div>{% endif %}
-          {%- if f.photo_2 and f.photo_2 != "" %}<div class="feat-photo" style="--img:url('{{ base }}{{ f.photo_2 }}')"></div>{% endif %}
-          {%- if f.photo_3 and f.photo_3 != "" %}<div class="feat-photo" style="--img:url('{{ base }}{{ f.photo_3 }}')"></div>{% endif %}
-        </div>
-        <div class="feat-text">
-          <span class="feat-num" aria-hidden="true">{% if forloop.index < 10 %}0{% endif %}{{ forloop.index }}</span>
-          {%- if f.eyebrow and f.eyebrow != "" %}<p class="eyebrow">{{ f.eyebrow | escape }}</p>{% endif %}
-          <h2>{{ f.heading | escape }}</h2>
-          {%- if f.text and f.text != "" %}<p class="feat-lead">{{ f.text | escape }}</p>{% endif %}
-          {%- if f.points.size > 0 %}
-          <ul class="feat-points">
-            {%- for pt in f.points %}{% if pt.title and pt.title != "" %}
-            <li><strong>{{ pt.title | escape }}</strong>{% if pt.text and pt.text != "" %}: {{ pt.text | escape }}{% endif %}</li>
-            {%- endif %}{% endfor %}
-          </ul>
-          {%- endif %}
-          {%- if f.button and f.button != "" %}<a href="{{ base }}/packages/#book" class="btn btn-primary">{{ f.button | escape }}</a>{% endif %}
-        </div>
-      </div>
-      {%- endif %}
-      {%- endfor %}
-    </section>
-    {%- endif %}
-
     <section id="about" class="section about">
       {%- if c.about.photo and c.about.photo != "" %}
       <img class="about-photo" src="{{ base }}{{ c.about.photo }}" alt="The photographer behind {{ c.business_name | escape }}" loading="lazy">
