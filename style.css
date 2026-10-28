@@ -383,6 +383,45 @@ h1, h2, h3 {
 .gallery.masonry .shot { grid-column: auto; grid-row-end: span 130; margin-bottom: 12px; }
 .gallery.masonry .shot.tall { grid-row-end: span 270; }
 
+/* ---------- Specialties (rolling + interiors, home page) ---------- */
+.specialties { display: grid; gap: 110px; }
+.feat {
+  display: grid;
+  grid-template-columns: 1.25fr 1fr;
+  gap: 56px;
+  align-items: center;
+  max-width: var(--max);
+  width: 100%;
+  margin: 0 auto;
+}
+.feat.rev { grid-template-columns: 1fr 1.25fr; }
+.feat.rev .feat-media { order: 2; }
+.feat-media {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  grid-template-rows: 1fr 1fr;
+  gap: 10px;
+  height: 560px;
+}
+.feat-photo { background: var(--img) center / cover no-repeat, var(--surface); border-radius: var(--radius); }
+.feat-photo:first-child { grid-row: span 2; }
+.feat-photo:only-child { grid-column: span 2; }
+.feat-text h2 { font-size: clamp(2.2rem, 4.5vw, 3.6rem); margin: 6px 0 14px; }
+.feat-num { display: block; font: 700 6rem/1 var(--display); color: transparent; -webkit-text-stroke: 1px #4a4a52; }
+.feat-lead { color: var(--muted); margin: 0; }
+.feat-points { list-style: none; padding: 0; margin: 20px 0 28px; }
+.feat-points li { position: relative; padding: 12px 0 12px 28px; border-bottom: 1px solid var(--line); color: var(--muted); }
+.feat-points li strong { color: var(--text); font-weight: 600; }
+.feat-points li::before { content: ""; position: absolute; left: 0; top: 23px; width: 14px; height: 2px; background: var(--accent); }
+@media (max-width: 900px) {
+  .specialties { gap: 72px; }
+  .feat, .feat.rev { grid-template-columns: 1fr; gap: 28px; }
+  .feat.rev .feat-media { order: 0; }
+  .feat-media { height: 440px; }
+  .feat-num { font-size: 4.5rem; }
+}
+@media (max-width: 560px) { .feat-media { height: 360px; } }
+
 /* ---------- Services ---------- */
 .services {
   display: grid;

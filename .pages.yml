@@ -624,6 +624,61 @@ content:
   - name: error_link
     label: Link text to email instead
     type: string
+- name: specialties
+  label: Specialties (home page)
+  type: file
+  path: _data/specialties.yml
+  format: yaml
+  fields:
+  - name: eyebrow
+    label: Section label (read by screen readers)
+    type: string
+  - name: heading
+    label: Section name
+    type: string
+  - name: items
+    label: Specialties
+    type: object
+    list:
+      collapsible:
+        collapsed: false
+        summary: '{eyebrow}'
+    fields:
+    - name: eyebrow
+      label: Small label (e.g. Rolling shots)
+      type: string
+    - name: heading
+      label: Heading
+      type: string
+    - name: text
+      label: Short description
+      type: text
+    - name: points
+      label: Bullet points
+      type: object
+      list:
+        collapsible:
+          collapsed: true
+          summary: '{title}'
+      fields:
+      - name: title
+        label: Bold part
+        type: string
+      - name: text
+        label: Rest of the line
+        type: string
+    - name: photo_main
+      label: Big photo (the tall one)
+      type: image
+    - name: photo_2
+      label: Small photo (top)
+      type: image
+    - name: photo_3
+      label: Small photo (bottom)
+      type: image
+    - name: button
+      label: Button text (goes to the booking form)
+      type: string
 - name: utmedia
   label: UTMedia page
   type: file

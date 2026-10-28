@@ -1,0 +1,31 @@
+eyebrow: Specialties
+heading: What I do best
+items:
+  - eyebrow: Rolling shots
+    heading: Built for speed
+    text: Car-to-car on real roads, with a chase car and a planned route.
+    points:
+      - title: Sharp car, streaking road
+        text: slow-shutter panning done right
+      - title: Canyon and highway routes
+        text: already scouted
+      - title: Safety first
+        text: a planned route and a dedicated driver
+    photo_main: /images/porsche-992-carrera-rolling.jpg
+    photo_2: /images/emira-track-rolling.jpg
+    photo_3: /images/corvette-c7-rolling.jpg
+    button: Book a rolling shoot
+  - eyebrow: Interior shots
+    heading: Every stitch
+    text: Controlled light inside the cabin, so leather, carbon and stitching read clearly.
+    points:
+      - title: Seats, dash and wheel
+        text: shot as a full set
+      - title: Close-ups
+        text: of badges, stitching and trim
+      - title: Made for sale listings
+        text: and build showcases
+    photo_main: /images/lamborghini-interior.jpg
+    photo_2: /images/ferrari-interior-seats.jpg
+    photo_3: /images/mclaren-solus-gt-badge.jpg
+    button: Book an interior shoot

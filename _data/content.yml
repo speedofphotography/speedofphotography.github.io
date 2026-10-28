@@ -12,10 +12,11 @@ navigation:
   email: Email
 hero:
   background: /images/hero-center.jpg
-  eyebrow: Automotive photography
+  eyebrow: Rolling & interior specialist
   title_line_1: Capturing motion,
   title_line_2: even when it's standing still.
-  subtitle: Rolling shots, detail work and editorial-style shoots for owners, shops, dealerships and events.
+  subtitle: Rolling shots that make a car look fast, and interior shots that show off every stitch. For owners,
+    shops, dealerships and events.
   primary_button: Book a shoot
   secondary_button: See the work
 highlights:
