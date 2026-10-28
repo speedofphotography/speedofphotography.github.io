@@ -440,12 +440,14 @@ content:
       label: Caption (for photos also in Home gallery photos, the home caption is used automatically)
       type: string
     - name: category
-      label: Filter category
+      label: Category (Rolling and Interior get their own tab on the Portfolio page)
       type: select
       options:
         values:
         - name: rolling
           label: Rolling
+        - name: interior
+          label: Interior
         - name: static
           label: Static
         - name: details
@@ -623,6 +625,24 @@ content:
     type: string
   - name: error_link
     label: Link text to email instead
+    type: string
+- name: portfolio_tabs
+  label: Portfolio tabs
+  type: file
+  path: _data/portfolio_tabs.yml
+  format: yaml
+  fields:
+  - name: intro
+    label: Line above the tabs
+    type: text
+  - name: rolling_tab
+    label: Rolling tab name
+    type: string
+  - name: interior_tab
+    label: Interiors tab name
+    type: string
+  - name: other_tab
+    label: Everything else tab name
     type: string
 - name: utmedia
   label: UTMedia page

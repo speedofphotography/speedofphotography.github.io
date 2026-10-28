@@ -383,6 +383,62 @@ h1, h2, h3 {
 .gallery.masonry .shot { grid-column: auto; grid-row-end: span 130; margin-bottom: 12px; }
 .gallery.masonry .shot.tall { grid-row-end: span 270; }
 
+/* ---------- Portfolio tabs: Rolling / Interiors / Everything else ---------- */
+.pf-intro { text-align: center; margin: 0 auto; }
+.pf-tabs {
+  display: flex;
+  justify-content: center;
+  width: max-content;
+  max-width: 100%;
+  margin: 24px auto 36px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.pf-tab {
+  padding: 14px 28px;
+  background: none;
+  border: 0;
+  color: var(--muted);
+  font: 700 1.05rem var(--display);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+}
+.pf-tab:hover { color: var(--text); }
+.pf-tab[aria-selected="true"] { background: var(--accent); color: #fff; }
+.pf-pane[hidden] { display: none; }
+.reel {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-snap-type: x mandatory;
+  scroll-behavior: smooth;
+  overscroll-behavior-x: contain;
+  padding: 0 2px 14px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--accent) transparent;
+}
+.reel::-webkit-scrollbar { height: 6px; }
+.reel::-webkit-scrollbar-thumb { background: var(--accent); border-radius: 3px; }
+.reel:focus-visible { outline: 1px solid var(--accent); outline-offset: 4px; }
+.reel .reel-shot {
+  flex: 0 0 auto;
+  height: min(68vh, 640px);
+  max-width: 100%;
+  aspect-ratio: var(--r, 3 / 2);
+  scroll-snap-align: start;
+}
+.reel .reel-shot:hover { transform: none; }
+@media (max-width: 760px) {
+  .pf-tab { padding: 12px 14px; font-size: 0.9rem; letter-spacing: 0.1em; }
+  /* Phones: every photo the same width and at its own proportions (nothing cropped) */
+  .reel { align-items: center; }
+  .reel .reel-shot { width: 84vw; height: auto; max-width: none; }
+}
+
 /* ---------- Services ---------- */
 .services {
   display: grid;

@@ -36,7 +36,7 @@ document.querySelectorAll(".filter").forEach((btn) => {
       b.setAttribute("aria-selected", String(b === btn));
     });
     const cat = btn.dataset.filter;
-    shots.forEach((s) => s.classList.toggle("is-hidden", cat !== "all" && s.dataset.cat !== cat));
+    shots.filter((s) => s.closest(".gallery")).forEach((s) => s.classList.toggle("is-hidden", cat !== "all" && s.dataset.cat !== cat));
   });
 });
 
@@ -49,7 +49,7 @@ document.querySelectorAll(".gallery.masonry").forEach((grid) => {
   items.forEach((shot) => { shot.dataset.ratio = shot.classList.contains("tall") ? 2 / 3 : 3 / 2; });
   const layout = () => {
     const visible = items.filter((s) => !s.classList.contains("is-hidden"));
-    if (!visible.length) return;
+    if (!visible.length || !grid.clientWidth) return;
     const cols = getComputedStyle(grid).gridTemplateColumns.split(" ").length;
     const gap = parseFloat(getComputedStyle(visible[0]).marginBottom) || 0;
     const colW = (grid.clientWidth - parseFloat(getComputedStyle(grid).columnGap || 0) * (cols - 1)) / cols;
@@ -80,6 +80,27 @@ document.querySelectorAll(".gallery.masonry").forEach((grid) => {
   document.querySelectorAll(".filter").forEach((btn) => btn.addEventListener("click", layout));
 });
 
+// ---------- Portfolio tabs (Rolling / Interiors / Everything else) ----------
+const pfTabs = [...document.querySelectorAll(".pf-tab")];
+if (pfTabs.length) {
+  const select = (tab) => {
+    pfTabs.forEach((t) => {
+      const on = t === tab;
+      t.setAttribute("aria-selected", String(on));
+      document.getElementById(`pane-${t.dataset.pane}`).hidden = !on;
+    });
+    window.dispatchEvent(new Event("resize")); // lets the staggered grid and row arrows measure the newly shown tab
+  };
+  pfTabs.forEach((t) => t.addEventListener("click", () => select(t)));
+  select(pfTabs[0]);
+}
+// Rows show each photo at its own proportions
+document.querySelectorAll(".reel-shot[data-src]").forEach((shot) => {
+  const img = new Image();
+  img.onload = () => shot.style.setProperty("--r", `${img.naturalWidth} / ${img.naturalHeight}`);
+  img.src = shot.dataset.src;
+});
+
 // ---------- Lightbox ----------
 const lightbox = document.getElementById("lightbox");
 if (lightbox) {
@@ -87,7 +108,8 @@ const lbImg = lightbox.querySelector(".lightbox-img");
 const lbCaption = lightbox.querySelector(".lightbox-caption");
 let current = 0;
 
-const visibleShots = () => shots.filter((s) => !s.classList.contains("is-hidden"));
+let group = null; // the row or grid of the photo that was opened
+const visibleShots = () => shots.filter((s) => !s.classList.contains("is-hidden") && (!group || s.parentElement === group));
 
 function show(index) {
   const list = visibleShots();
@@ -100,6 +122,7 @@ function show(index) {
 }
 
 function openLightbox(shot) {
+  group = shot.parentElement;
   show(visibleShots().indexOf(shot));
   lightbox.hidden = false;
   document.body.style.overflow = "hidden";
@@ -245,10 +268,10 @@ if ("IntersectionObserver" in window) {
 
 // ---------- Location cards: one sideways-scrolling row with arrow buttons ----------
 document.querySelectorAll(".locations-scroller").forEach((wrap) => {
-  const row = wrap.querySelector(".locations");
+  const row = wrap.querySelector(".locations, .reel");
   const prev = wrap.querySelector(".locations-arrow.prev");
   const next = wrap.querySelector(".locations-arrow.next");
-  const step = () => (row.querySelector(".location")?.offsetWidth || row.clientWidth) + 16;
+  const step = () => (row.firstElementChild?.offsetWidth || row.clientWidth) + (parseFloat(getComputedStyle(row).columnGap) || 16);
   const update = () => {
     prev.hidden = row.scrollLeft <= 4;
     next.hidden = row.scrollLeft + row.clientWidth >= row.scrollWidth - 4;

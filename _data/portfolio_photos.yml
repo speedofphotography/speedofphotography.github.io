@@ -37,7 +37,7 @@ photos:
     size: tall
   - image: /images/lamborghini-interior.jpg
     caption: Lamborghini Aventador SV interior
-    category: details
+    category: interior
     size: tall
   - image: /images/porsche-crest.jpg
     caption: Porsche crest
@@ -65,7 +65,7 @@ photos:
     size: tall
   - image: /images/ferrari-interior-seats.jpg
     caption: Ferrari LaFerrari interior
-    category: details
+    category: interior
     size: tall
   - image: /images/yamaha-r6-rolling.jpg
     caption: Yamaha R6

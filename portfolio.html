@@ -16,13 +16,53 @@ permalink: /portfolio/
       </div>
     </section>
 
+    {%- comment %}
+      Concept C: Rolling and Interiors lead as sideways-scrolling rows; everything else keeps the staggered grid.
+      Tab names live in _data/portfolio_tabs.yml. A photo goes in a tab by its category (rolling / interior / anything else).
+    {% endcomment %}
+    {%- assign tabs = site.data.portfolio_tabs %}
+    {%- assign home_photos = site.data.gallery_photos.photos %}
+    {%- assign all_photos = site.data.portfolio_photos.photos %}
+    {%- assign rolling_photos = all_photos | where: "category", "rolling" %}
+    {%- assign interior_photos = all_photos | where: "category", "interior" %}
+    {%- assign other_count = all_photos.size | minus: rolling_photos.size | minus: interior_photos.size %}
+    {%- assign used_cats = all_photos | map: "category" %}
     <section class="section portfolio-section" aria-label="Photos">
+      {%- if tabs.intro and tabs.intro != "" %}<p class="section-sub pf-intro">{{ tabs.intro | escape }}</p>{% endif %}
+      <div class="pf-tabs" role="tablist" aria-label="Portfolio sections">
+        {%- if rolling_photos.size > 0 %}<button class="pf-tab" role="tab" data-pane="rolling" aria-selected="false">{{ tabs.rolling_tab | default: "Rolling" | escape }}</button>{% endif %}
+        {%- if interior_photos.size > 0 %}<button class="pf-tab" role="tab" data-pane="interior" aria-selected="false">{{ tabs.interior_tab | default: "Interiors" | escape }}</button>{% endif %}
+        {%- if other_count > 0 %}<button class="pf-tab" role="tab" data-pane="other" aria-selected="false">{{ tabs.other_tab | default: "Everything else" | escape }}</button>{% endif %}
+      </div>
+
+      {%- for pane in (1..2) %}
+      {%- if forloop.first %}{% assign pane_id = "rolling" %}{% assign pane_photos = rolling_photos %}{% else %}{% assign pane_id = "interior" %}{% assign pane_photos = interior_photos %}{% endif %}
+      {%- if pane_photos.size > 0 %}
+      <div class="pf-pane" id="pane-{{ pane_id }}" role="tabpanel">
+        <div class="locations-scroller reel-scroller">
+          <button type="button" class="locations-arrow prev" aria-label="Scroll photos left" hidden>&#8249;</button>
+          <div class="reel" tabindex="0" aria-label="Photos, scroll sideways for more">
+            {%- for p in pane_photos %}
+            {%- comment %} Photos by other photographers (images/credited/) must never appear in the gallery or portfolio. {% endcomment %}
+            {%- if p.image contains "/credited/" %}{% continue %}{% endif %}
+            {%- unless p.image and p.image != "" %}{% continue %}{% endunless %}
+            {%- assign caption = p.caption %}
+            {%- assign home_match = home_photos | where: "image", p.image | first %}
+            {%- if home_match and home_match.caption and home_match.caption != "" %}{% assign caption = home_match.caption %}{% endif %}
+            <figure class="shot reel-shot" data-cat="{{ p.category | escape }}" data-src="{{ base }}{{ p.image }}" style="--img:url('{{ base }}{{ p.image }}');--r:{% if p.size == 'tall' %}2/3{% else %}3/2{% endif %}"><figcaption>{{ caption | escape }}</figcaption></figure>
+            {%- endfor %}
+          </div>
+          <button type="button" class="locations-arrow next" aria-label="Scroll photos right" hidden>&#8250;</button>
+        </div>
+      </div>
+      {%- endif %}
+      {%- endfor %}
+
+      {%- if other_count > 0 %}
+      <div class="pf-pane" id="pane-other" role="tabpanel">
       <div class="filters" role="tablist" aria-label="Filter photos">
         <button class="filter is-active" data-filter="all" role="tab" aria-selected="true">{{ c.filters.all | default: "All" | escape }}</button>
-        {%- assign used_cats = site.data.portfolio_photos.photos | map: "category" %}
-        {%- if used_cats contains "rolling" %}
-        <button class="filter" data-filter="rolling" role="tab" aria-selected="false">{{ c.filters.rolling | default: "Rolling" | escape }}</button>
-        {%- endif %}{% if used_cats contains "static" %}
+        {%- if used_cats contains "static" %}
         <button class="filter" data-filter="static" role="tab" aria-selected="false">{{ c.filters.static | default: "Static" | escape }}</button>
         {%- endif %}{% if used_cats contains "details" %}
         <button class="filter" data-filter="details" role="tab" aria-selected="false">{{ c.filters.details | default: "Details" | escape }}</button>
@@ -31,8 +71,8 @@ permalink: /portfolio/
         {%- endif %}
       </div>
       <div class="gallery masonry">
-        {%- assign home_photos = site.data.gallery_photos.photos %}
-        {%- for p in site.data.portfolio_photos.photos %}
+        {%- for p in all_photos %}
+        {%- if p.category == "rolling" or p.category == "interior" %}{% continue %}{% endif %}
         {%- comment %} Photos by other photographers (images/credited/) must never appear in the gallery or portfolio. {% endcomment %}
         {%- if p.image contains "/credited/" %}{% continue %}{% endif %}
         {%- comment %} A photo that is also on the home page always uses the home page caption. {% endcomment %}
@@ -44,6 +84,8 @@ permalink: /portfolio/
         <figure class="shot{% if p.size == 'wide' %} wide{% elsif p.size == 'tall' %} tall{% endif %}" data-cat="{{ p.category | escape }}"{% if p.image and p.image != "" %} data-src="{{ base }}{{ p.image }}" style="--img:url('{{ base }}{{ p.image }}')"{% endif %}><figcaption>{{ caption | escape }}</figcaption></figure>
         {%- endfor %}
       </div>
+      </div>
+      {%- endif %}
       <div class="section-cta">
         <a href="{{ base }}/packages/#book" class="btn btn-primary">{{ pf.book_button | default: "Book a shoot" | escape }}</a>
         <a href="{{ base }}/packages/" class="btn btn-ghost">{{ pf.packages_button | default: "See packages" | escape }}</a>
