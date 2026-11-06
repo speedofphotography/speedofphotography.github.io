@@ -1,0 +1,141 @@
+/* "Shot in real time" intro: little cars drive to each element, a viewfinder focuses on it, and it's captured. */
+html.fx-hold main, html.fx-hold .site-header, html.fx-hold .site-footer { visibility: hidden; }
+html.fx-on .reveal { opacity: 1; transform: none; transition: none; }
+.fx-wait { visibility: hidden !important; }
+
+/* Letters arrive like a slow-shutter pan: a streak that settles into a sharp letter */
+fx-c { opacity: 0; }
+fx-c.on { opacity: 1; animation: fx-pan 0.46s cubic-bezier(0.22, 0.61, 0.36, 1); }
+@keyframes fx-pan {
+  from { opacity: 0; text-shadow: -14px 0 8px currentColor; }
+  to { opacity: 1; text-shadow: 0 0 0 transparent; }
+}
+
+.fx-layer { position: absolute; top: 0; left: 0; width: 100%; height: 0; overflow: hidden; z-index: 70; pointer-events: none; }
+
+/* Cars */
+.fx-car {
+  position: absolute;
+  top: 0;
+  left: 0;
+  opacity: 0;
+  transition: transform 0.48s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.35s;
+  will-change: transform;
+}
+.fx-car.on { opacity: 1; }
+.fx-car img {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 64px;
+  width: auto;
+  max-width: none;
+  translate: -50% -50%;
+  transition: transform 0.34s cubic-bezier(0.4, 0, 0.2, 1);
+  filter: drop-shadow(0 3px 5px rgba(0, 0, 0, 0.6));
+}
+.fx-car span {
+  position: absolute;
+  top: 32px;
+  left: 22px;
+  padding: 0 5px;
+  background: var(--fx-color);
+  color: #0b0b0c;
+  font: 700 10px/1.6 "Barlow Condensed", system-ui, sans-serif;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+/* The streak a car leaves behind it */
+.fx-trail {
+  position: absolute;
+  height: 10px;
+  margin-top: -5px;
+  transform-origin: 0 50%;
+  background: linear-gradient(90deg, transparent, rgba(46, 123, 255, 0.5) 70%, rgba(255, 255, 255, 0.75));
+  filter: blur(2px);
+}
+
+/* Viewfinder focus brackets */
+.fx-box { position: absolute; animation: fx-hunt 0.42s cubic-bezier(0.22, 0.61, 0.36, 1); transition: opacity 0.45s ease; }
+.fx-box.out { opacity: 0; }
+@keyframes fx-hunt {
+  from { transform: scale(1.05); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+.fx-box i { position: absolute; width: 14px; height: 14px; border: 0 solid #fff; transition: border-color 0.35s ease; }
+.fx-box i:nth-child(1) { top: -3px; left: -3px; border-width: 2px 0 0 2px; }
+.fx-box i:nth-child(2) { top: -3px; right: -3px; border-width: 2px 2px 0 0; }
+.fx-box i:nth-child(3) { bottom: -3px; left: -3px; border-width: 0 0 2px 2px; }
+.fx-box i:nth-child(4) { bottom: -3px; right: -3px; border-width: 0 2px 2px 0; }
+.fx-box.lock i { border-color: #2e7bff; }
+.fx-box b {
+  position: absolute;
+  left: 0;
+  top: 100%;
+  margin-top: 6px;
+  padding: 1px 6px;
+  background: rgba(11, 11, 12, 0.85);
+  color: #fff;
+  font: 500 10px/1.5 ui-monospace, Consolas, monospace;
+  white-space: nowrap;
+  opacity: 0;
+  transition: opacity 0.35s ease;
+}
+.fx-box.lock b { opacity: 1; }
+.fx-flash { position: absolute; inset: 0; background: #fff; opacity: 0; }
+
+/* Full-screen viewfinder while the banner builds */
+.fx-vf { position: fixed; inset: 14px; z-index: 69; pointer-events: none; transition: opacity 0.7s ease; }
+.fx-vf.out { opacity: 0; }
+.fx-vf i { position: absolute; width: 34px; height: 34px; border: 0 solid rgba(255, 255, 255, 0.75); }
+.fx-vf i:nth-child(1) { top: 0; left: 0; border-width: 2px 0 0 2px; }
+.fx-vf i:nth-child(2) { top: 0; right: 0; border-width: 2px 2px 0 0; }
+.fx-vf i:nth-child(3) { bottom: 0; left: 0; border-width: 0 0 2px 2px; }
+.fx-vf i:nth-child(4) { bottom: 0; right: 0; border-width: 0 2px 2px 0; }
+.fx-vf::before { /* rule of thirds */
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(90deg, transparent calc(33.33% - 0.5px), rgba(255, 255, 255, 0.16) 33.33%, transparent calc(33.33% + 0.5px), transparent calc(66.66% - 0.5px), rgba(255, 255, 255, 0.16) 66.66%, transparent calc(66.66% + 0.5px)),
+    linear-gradient(transparent calc(33.33% - 0.5px), rgba(255, 255, 255, 0.16) 33.33%, transparent calc(33.33% + 0.5px), transparent calc(66.66% - 0.5px), rgba(255, 255, 255, 0.16) 66.66%, transparent calc(66.66% + 0.5px));
+}
+
+/* Camera readout */
+.fx-chip {
+  position: fixed;
+  left: 50%;
+  bottom: 22px;
+  z-index: 71;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 8px 6px 12px;
+  transform: translateX(-50%);
+  background: rgba(11, 11, 12, 0.9);
+  border: 1px solid #2a2a2e;
+  color: #c9c9cc;
+  font: 500 12px/1.4 ui-monospace, Consolas, monospace;
+  white-space: nowrap;
+  opacity: 0;
+  transition: opacity 0.25s;
+  pointer-events: none;
+}
+.fx-chip.on { opacity: 1; pointer-events: auto; }
+.fx-chip::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: #2e7bff; animation: fx-blink 0.9s steps(2) infinite; }
+@keyframes fx-blink { 50% { opacity: 0.25; } }
+.fx-count { color: #fff; }
+.fx-chip button {
+  padding: 2px 8px;
+  background: none;
+  border: 1px solid #3a3a40;
+  color: #fff;
+  font: inherit;
+  cursor: pointer;
+}
+@media (max-width: 760px) {
+  .fx-vf { inset: 8px; }
+  .fx-vf i { width: 24px; height: 24px; }
+  .fx-chip { bottom: 14px; gap: 8px; font-size: 11px; }
+}
