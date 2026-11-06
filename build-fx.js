@@ -19,11 +19,8 @@
     ".contact-info", ".contact-form", ".utm-form",
   ].join(",");
   const NAMES = [["Rollers", "#ffffff"], ["Interiors", "#8fb8ff"], ["Details", "#2e7bff"], ["Statics", "#ffffff"], ["Events", "#8fb8ff"], ["Track", "#2e7bff"]];
-  // Every car is from a real shoot. Top-down cars steer; high-angle cars keep their angle and flip to face the way they're going.
-  const PHOTOS = [
-    ["huracan-purple"], ["mclaren-570s"], ["audi-r8"], ["gtr-r35"], ["mclaren-spider"], ["audi-wrapped"], ["nissan-370z"],
-    ["skyline-r34", true], ["mustang", true],
-  ].sort(() => Math.random() - 0.5);
+  // Every car is a top-down shot from a real shoot
+  const PHOTOS = ["huracan-purple", "mclaren-570s", "audi-r8", "gtr-r35", "mclaren-spider", "audi-wrapped", "nissan-370z"].sort(() => Math.random() - 0.5);
   let nextPhoto = 0;
   const EXPOSURES = ["1/60s  f/8  ISO 100", "1/40s  f/11  ISO 64", "1/125s  f/5.6  ISO 200", "1/30s  f/16  ISO 50", "1/250s  f/2.8  ISO 400", "1/80s  f/9  ISO 100"];
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -74,11 +71,8 @@
 
   const carSrc = (file) => `/images/fx-cars/${file}.png`;
   function dress(agent) {
-    const [file, highAngle] = PHOTOS[nextPhoto++ % PHOTOS.length];
-    agent.img.src = carSrc(file);
-    agent.img.classList.toggle("high", !!highAngle);
+    agent.img.src = carSrc(PHOTOS[nextPhoto++ % PHOTOS.length]);
     agent.img.style.transform = "";
-    agent.highAngle = !!highAngle;
     agent.rot = 0;
   }
 
@@ -95,7 +89,7 @@
     dress(agent);
     return agent;
   });
-  PHOTOS.forEach(([file]) => { new Image().src = carSrc(file); }); // ready before they're needed
+  PHOTOS.forEach((file) => { new Image().src = carSrc(file); }); // ready before they're needed
 
   const chip = document.createElement("div");
   chip.className = "fx-chip";
@@ -110,13 +104,9 @@
     const dist = Math.hypot(dx, dy);
     if (dist > 30) {
       const angle = Math.atan2(dy, dx) * (180 / Math.PI);
-      if (agent.highAngle) {
-        agent.img.style.transform = `scaleX(${dx < 0 ? -1 : 1})`;
-      } else {
-        const turn = ((angle + 90 - agent.rot + 540) % 360) - 180; // the photos point up; turn the short way round
-        agent.rot += turn;
-        agent.img.style.transform = `rotate(${agent.rot}deg)`;
-      }
+      const turn = ((angle + 90 - agent.rot + 540) % 360) - 180; // the photos point up; turn the short way round
+      agent.rot += turn;
+      agent.img.style.transform = `rotate(${agent.rot}deg)`;
       const trail = document.createElement("div");
       trail.className = "fx-trail";
       trail.style.cssText = `left:${agent.x}px;top:${agent.y}px;width:${dist}px;transform:rotate(${angle}deg)`;
