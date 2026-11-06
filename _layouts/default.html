@@ -29,12 +29,13 @@
         var root = document.documentElement;
         if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
         if (location.search.indexOf("build") < 0 && sessionStorage.getItem("fx:" + location.pathname)) return;
+        if (location.search.indexOf("build") < 0 && sessionStorage.getItem("fx:nav")) root.classList.add("fx-nav-done");
         root.classList.add("fx-hold");
         setTimeout(function () { if (!window.__fx) root.classList.remove("fx-hold"); }, 2500);
       } catch (e) {}
     })();
   </script>
-  <link rel="stylesheet" href="{{ base }}/build-fx.css?v=2">
+  <link rel="stylesheet" href="{{ base }}/build-fx.css?v=3">
 </head>
 <body>
   <header class="site-header">
@@ -83,6 +84,6 @@
   </footer>
 
   <script src="{{ base }}/script.js?v=15"></script>
-  <script src="{{ base }}/build-fx.js?v=2"></script>
+  <script src="{{ base }}/build-fx.js?v=3"></script>
 </body>
 </html>

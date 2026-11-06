@@ -39,7 +39,9 @@
   // ---------- Collect what to build ----------
   const toggle = document.querySelector(".nav-toggle");
   const phoneMenu = toggle && getComputedStyle(toggle).display !== "none"; // the slide-down menu stays as it is
-  const all = [...document.querySelectorAll(SELECTOR)].filter((el) => el.offsetParent !== null && !(phoneMenu && el.closest(".nav-links")));
+  const navDone = root.classList.contains("fx-nav-done"); // the top bar only builds on the first page of a visit
+  try { sessionStorage.setItem("fx:nav", "1"); } catch (e) { /* private mode: it just replays */ }
+  const all = [...document.querySelectorAll(SELECTOR)].filter((el) => el.offsetParent !== null && !(phoneMenu && el.closest(".nav-links")) && !(navDone && el.closest(".site-header")));
   const targets = all.filter((el) => !all.some((other) => other !== el && other.contains(el)));
   let remaining = targets.length;
   let frames = 0;
