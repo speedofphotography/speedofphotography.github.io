@@ -18,7 +18,13 @@
     ".package", ".addon", ".notes", ".location",
     ".contact-info", ".contact-form", ".utm-form",
   ].join(",");
-  const CARS = [["Rollers", "#ffffff", "purple"], ["Interiors", "#8fb8ff", "blue"], ["Details", "#2e7bff", "silver"], ["Statics", "#ffffff", "purple"], ["Events", "#8fb8ff", "blue"]];
+  const NAMES = [["Rollers", "#ffffff"], ["Interiors", "#8fb8ff"], ["Details", "#2e7bff"], ["Statics", "#ffffff"], ["Events", "#8fb8ff"], ["Track", "#2e7bff"]];
+  // Every car is from a real shoot. Top-down cars steer; high-angle cars keep their angle and flip to face the way they're going.
+  const PHOTOS = [
+    ["huracan-purple"], ["mclaren-570s"], ["audi-r8"], ["gtr-r35"], ["mclaren-spider"], ["audi-wrapped"], ["nissan-370z"],
+    ["skyline-r34", true], ["mustang", true],
+  ].sort(() => Math.random() - 0.5);
+  let nextPhoto = 0;
   const EXPOSURES = ["1/60s  f/8  ISO 100", "1/40s  f/11  ISO 64", "1/125s  f/5.6  ISO 200", "1/30s  f/16  ISO 50", "1/250s  f/2.8  ISO 400", "1/80s  f/9  ISO 100"];
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const pageKey = `fx:${location.pathname}`;
@@ -56,17 +62,30 @@
   finder.innerHTML = "<i></i><i></i><i></i><i></i>";
   document.body.append(finder);
 
-  const agents = CARS.map(([name, color, photo], i) => {
+  const carSrc = (file) => `/images/fx-cars/${file}.png`;
+  function dress(agent) {
+    const [file, highAngle] = PHOTOS[nextPhoto++ % PHOTOS.length];
+    agent.img.src = carSrc(file);
+    agent.img.classList.toggle("high", !!highAngle);
+    agent.img.style.transform = "";
+    agent.highAngle = !!highAngle;
+    agent.rot = 0;
+  }
+
+  const agents = NAMES.map(([name, color], i) => {
     const el = document.createElement("div");
     el.className = "fx-car";
     el.style.setProperty("--fx-color", color);
-    el.innerHTML = `<img src="/images/fx-cars/huracan-${photo}.png" alt=""><span>${name}</span>`;
+    el.innerHTML = `<img alt=""><span>${name}</span>`;
     const x = -40;
     const y = innerHeight * (0.15 + i * 0.16);
     el.style.transform = `translate(${x}px, ${y}px)`;
     layer.append(el);
-    return { el, svg: el.querySelector("img"), x, y, rot: 0, busy: false };
+    const agent = { el, img: el.querySelector("img"), x, y, rot: 0, busy: false };
+    dress(agent);
+    return agent;
   });
+  PHOTOS.forEach(([file]) => { new Image().src = carSrc(file); }); // ready before they're needed
 
   const chip = document.createElement("div");
   chip.className = "fx-chip";
@@ -81,9 +100,13 @@
     const dist = Math.hypot(dx, dy);
     if (dist > 30) {
       const angle = Math.atan2(dy, dx) * (180 / Math.PI);
-      const turn = ((angle + 90 - agent.rot + 540) % 360) - 180; // the photos point up; turn the short way round
-      agent.rot += turn;
-      agent.svg.style.transform = `rotate(${agent.rot}deg)`;
+      if (agent.highAngle) {
+        agent.img.style.transform = `scaleX(${dx < 0 ? -1 : 1})`;
+      } else {
+        const turn = ((angle + 90 - agent.rot + 540) % 360) - 180; // the photos point up; turn the short way round
+        agent.rot += turn;
+        agent.img.style.transform = `rotate(${agent.rot}deg)`;
+      }
       const trail = document.createElement("div");
       trail.className = "fx-trail";
       trail.style.cssText = `left:${agent.x}px;top:${agent.y}px;width:${dist}px;transform:rotate(${angle}deg)`;
@@ -238,6 +261,7 @@
   }
 
   async function work(agent, el) {
+    if (!agent.el.classList.contains("on")) dress(agent); // a parked car swaps out, so every car gets a turn
     agent.busy = true;
     await build(agent, el, pace());
     agent.busy = false;
