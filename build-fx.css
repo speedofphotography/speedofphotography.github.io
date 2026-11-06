@@ -1,5 +1,5 @@
 /* "Shot in real time" intro: little cars drive to each element, a viewfinder focuses on it, and it's captured. */
-html.fx-hold main, html.fx-hold:not(.fx-nav-done) .site-header, html.fx-hold .site-footer { visibility: hidden; }
+html.fx-hold main, html.fx-hold .site-header, html.fx-hold .site-footer { visibility: hidden; }
 html.fx-on .reveal { opacity: 1; transform: none; transition: none; }
 .fx-wait { visibility: hidden !important; }
 

@@ -23,19 +23,18 @@
   <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,500;0,700;1,700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="{{ base }}/style.css?v=23">
   <script>
-    // Page-build animation: hide the page until build-fx.js takes over (once per visit, never for reduced motion)
+    // Page-build animation: first page of a visit only, never for reduced motion. Hides the page until build-fx.js takes over.
     (function () {
       try {
         var root = document.documentElement;
         if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-        if (location.search.indexOf("build") < 0 && sessionStorage.getItem("fx:" + location.pathname)) return;
-        if (location.search.indexOf("build") < 0 && sessionStorage.getItem("fx:nav")) root.classList.add("fx-nav-done");
+        if (location.search.indexOf("build") < 0 && sessionStorage.getItem("fx:visit")) return;
         root.classList.add("fx-hold");
         setTimeout(function () { if (!window.__fx) root.classList.remove("fx-hold"); }, 2500);
       } catch (e) {}
     })();
   </script>
-  <link rel="stylesheet" href="{{ base }}/build-fx.css?v=3">
+  <link rel="stylesheet" href="{{ base }}/build-fx.css?v=4">
 </head>
 <body>
   <header class="site-header">
@@ -84,6 +83,6 @@
   </footer>
 
   <script src="{{ base }}/script.js?v=15"></script>
-  <script src="{{ base }}/build-fx.js?v=3"></script>
+  <script src="{{ base }}/build-fx.js?v=4"></script>
 </body>
 </html>

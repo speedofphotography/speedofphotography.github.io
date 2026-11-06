@@ -1,4 +1,4 @@
-// "Shot in real time" intro. Each page builds itself once per visit: little cars drive to each element,
+// "Shot in real time" intro, played only on the first page of a visit: little cars drive to each element,
 // a viewfinder focuses on it, and it's captured (photos flash into focus, headlines pan in like a slow-shutter shot).
 // Sections below the fold build as they scroll into view.
 // Skipped for people who ask for reduced motion, and visitors can press Skip at any time.
@@ -27,22 +27,30 @@
   let nextPhoto = 0;
   const EXPOSURES = ["1/60s  f/8  ISO 100", "1/40s  f/11  ISO 64", "1/125s  f/5.6  ISO 200", "1/30s  f/16  ISO 50", "1/250s  f/2.8  ISO 400", "1/80s  f/9  ISO 100"];
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-  const pageKey = `fx:${location.pathname}`;
 
   // ---------- Pace: the faster someone scrolls, the faster the page keeps up ----------
   let scrollSpeed = 0; // px per second
   const queue = []; // one shared line, always worked through from the top of the page down
   const backlog = () => queue.length;
-  const pace = () => (scrollSpeed > 800 ? 0.6 : 1);
-  const rushing = () => scrollSpeed > 2200 || backlog() > 14;
+  const pace = () => (scrollSpeed > 1500 || backlog() > 10 ? 0.45 : scrollSpeed > 600 ? 0.7 : 1);
 
   // ---------- Collect what to build ----------
   const toggle = document.querySelector(".nav-toggle");
   const phoneMenu = toggle && getComputedStyle(toggle).display !== "none"; // the slide-down menu stays as it is
-  const navDone = root.classList.contains("fx-nav-done"); // the top bar only builds on the first page of a visit
-  try { sessionStorage.setItem("fx:nav", "1"); } catch (e) { /* private mode: it just replays */ }
-  const all = [...document.querySelectorAll(SELECTOR)].filter((el) => el.offsetParent !== null && !(phoneMenu && el.closest(".nav-links")) && !(navDone && el.closest(".site-header")));
+  try { sessionStorage.setItem("fx:visit", "1"); } catch (e) { /* private mode: it just replays */ }
+  const all = [...document.querySelectorAll(SELECTOR)].filter((el) => el.offsetParent !== null && !(phoneMenu && el.closest(".nav-links")));
   const targets = all.filter((el) => !all.some((other) => other !== el && other.contains(el)));
+  // Anything the list above doesn't name still gets built, so nothing on the page is left out
+  function cover(node) {
+    [...node.children].forEach((child) => {
+      if (targets.includes(child) || child.offsetParent === null) return;
+      if (child.matches(".lightbox, .hero-bg, .honeypot, .fx-layer") || (phoneMenu && child.matches(".nav-links"))) return;
+      if (targets.some((t) => child.contains(t))) cover(child);
+      else targets.push(child);
+    });
+  }
+  document.querySelectorAll(".site-header, main, .site-footer").forEach(cover);
+  const pending = new Set(targets);
   let remaining = targets.length;
   let frames = 0;
   let shots = 0;
@@ -153,11 +161,11 @@
     el.classList.remove("fx-wait");
     const step = Math.min(heading ? 26 : 34, (heading ? 700 : 600) / Math.max(parts.length, 1));
     for (const part of parts) {
-      if (skipped || rushing()) break;
+      if (skipped) break;
       part.classList.add("on");
       await sleep(step * pace());
     }
-    if (!skipped && !rushing()) await sleep(460); // let the last letters settle before tidying up
+    if (!skipped) await sleep(460 * pace()); // let the last letters settle before tidying up
     el.innerHTML = saved; // back to the original markup, nothing left behind
   }
 
@@ -194,21 +202,23 @@
     chipCount.textContent = `[ ${String(frames).padStart(3, "0")} ]`;
   }
 
-  // No car, no waiting: for fast scrolling and anything already scrolled past
+  // Only for things already scrolled past, which nobody can see. Everything on screen gets the full treatment.
   function quick(el) {
     el.classList.remove("fx-wait");
     tick();
-    if (el.getBoundingClientRect().bottom > 0) el.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 240, easing: "ease-out" });
   }
 
-  function flush() {
-    while (queue.length) quick(queue.shift());
+  const passed = (el) => el.getBoundingClientRect().bottom < 0;
+  function sweep() {
+    for (let i = queue.length - 1; i >= 0; i--) {
+      if (passed(queue[i])) quick(queue.splice(i, 1)[0]);
+    }
     settle();
   }
 
   async function build(agent, el, p) {
     const r = el.getBoundingClientRect();
-    if (r.bottom < 0 || r.top > innerHeight * 1.3 || rushing()) { quick(el); return; }
+    if (r.bottom < 0) { quick(el); return; }
     layer.style.height = `${document.documentElement.scrollHeight}px`; // clips anything that would widen the page on phones
     const inHeader = el.closest(".site-header");
     const top = r.top + (inHeader ? 0 : scrollY);
@@ -276,13 +286,13 @@
     if (queue.length || agents.some((a) => a.busy)) return;
     chip.classList.remove("on");
     finder.classList.add("out");
-    try { sessionStorage.setItem(pageKey, "1"); } catch (e) { /* private mode: it just replays */ }
     if (!remaining) finish();
   }
 
   function enqueue(el) {
+    pending.delete(el);
     remaining--;
-    if (rushing() || el.getBoundingClientRect().bottom < 0) { quick(el); settle(); return; }
+    if (passed(el)) { quick(el); settle(); return; }
     const heading = el.closest("section")?.querySelector("h2");
     if (heading) chipText.textContent = `Shooting: ${heading.textContent.trim().slice(0, 26)}`;
     chip.classList.add("on");
@@ -298,7 +308,6 @@
     skipped = true;
     io.disconnect();
     remaining = 0;
-    try { sessionStorage.setItem(pageKey, "1"); } catch (e) { /* private mode: it just replays */ }
     document.querySelectorAll(".fx-wait").forEach((el) => el.classList.remove("fx-wait"));
     document.querySelectorAll("fx-c").forEach((el) => el.classList.add("on"));
     finish();
@@ -311,6 +320,13 @@
     pump();
   }, { rootMargin: "100000px 0px -10% 0px" }); // builds once it is on screen; the huge top margin catches anything jumped past
 
+  // The last things on the page may never reach the trigger line, so the bottom of the page calls them in
+  function atBottom() {
+    if (scrollY + innerHeight < document.documentElement.scrollHeight - 8) return;
+    [...pending].filter((el) => el.getBoundingClientRect().left < innerWidth).forEach((el) => { io.unobserve(el); enqueue(el); });
+    pump();
+  }
+
   let lastY = scrollY;
   let lastT = performance.now();
   let calm;
@@ -321,11 +337,23 @@
     scrollSpeed = scrollSpeed * 0.4 + (Math.abs(scrollY - lastY) / dt) * 1000 * 0.6;
     lastY = scrollY;
     lastT = now;
-    if (rushing()) flush();
+    sweep();
+    atBottom();
     clearTimeout(calm);
     calm = setTimeout(() => { scrollSpeed = 0; }, 150);
   }, { passive: true });
   // Wait for the fonts first: they change where everything sits, and the focus brackets must line up
   const fontsReady = document.fonts ? document.fonts.ready : Promise.resolve();
-  Promise.race([fontsReady, sleep(900)]).then(() => targets.forEach((el) => io.observe(el)));
+  Promise.race([fontsReady, sleep(900)]).then(() => {
+    // The banner photo pulls into focus first, then the cars get to work
+    document.querySelector(".hero-bg, .page-hero.has-banner")?.animate(
+      [{ filter: "blur(16px) brightness(0.6)" }, { filter: "blur(0) brightness(1)" }],
+      { duration: 1100, easing: "cubic-bezier(0.25, 0.1, 0.25, 1)" },
+    );
+    targets.forEach((el) => io.observe(el));
+    // Everything on the first screen builds now, even things low on the screen like the scroll cue
+    targets.filter((el) => { const r = el.getBoundingClientRect(); return r.top < innerHeight && r.left < innerWidth; }).forEach((el) => { io.unobserve(el); enqueue(el); });
+    pump();
+    atBottom();
+  });
 })();
