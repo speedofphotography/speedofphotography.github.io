@@ -4,3 +4,6 @@ exclude:
   - images/README.md
   - images/credited/README.md
   - .pages.yml
+  - Gemfile
+  - Gemfile.lock
+  - vendor
