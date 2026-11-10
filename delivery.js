@@ -1,15 +1,5 @@
 // ---------- Client photo delivery (the page at /g/<code>/) ----------
-//
-// HOW TO DELIVER A SHOOT
-// 1. Cloudflare dashboard > R2 > bucket "sop-deliveries" > create a folder named with a code nobody could
-//    guess, e.g. marcus-gt3-k7q2m9 (letters, numbers, - and _). There are no passwords: the link is the key.
-// 2. Upload the finished photos (and any videos/PDFs) into that folder. File names set the order.
-// 3. Optional: add gallery.json to the folder:
-//      { "title": "Marcus's GT3 RS", "client": "Marcus", "date": "2026-11-10",
-//        "message": "Thanks for a great shoot!", "expires": "2027-02-01" }
-// 4. Send the client https://speedofphotography.com/g/marcus-gt3-k7q2m9/
-// To take a gallery down, delete the folder (or set "expires" to a past date).
-//
+// How galleries are organised, delivered and previewed: _delivery/README.md
 // Previews and the large view are resized by Cloudflare Image Transformations (5,000 new sizes a month free;
 // each photo uses 2). Downloads are always the untouched originals.
 
@@ -25,8 +15,10 @@ const els = {
 const code = (location.pathname.match(/^\/g\/([^/]+)/) || [])[1] || "";
 const enc = encodeURIComponent;
 const fileUrl = (f, dl) => `/api/gallery/${enc(code)}/file/${enc(f.name)}${dl ? "?dl=1" : ""}`;
-const sized = (f, width) =>
-  `/cdn-cgi/image/width=${width},quality=85,fit=scale-down,format=auto,onerror=redirect${fileUrl(f)}`;
+// Cloudflare resizes previews on the live site; the local preview (_delivery/preview) shows originals.
+const LOCAL = /^(localhost|127\.0\.0\.1)$/.test(location.hostname);
+const sized = (f, width) => LOCAL ? fileUrl(f)
+  : `/cdn-cgi/image/width=${width},quality=85,fit=scale-down,format=auto,onerror=redirect${fileUrl(f)}`;
 const THUMB = 900;
 const LARGE = 2400;
 
@@ -52,6 +44,7 @@ function setState(message) {
 if (!code) {
   document.title = `Client gallery | ${document.title.split("|").pop().trim()}`;
   setState("");
+  els.title.textContent = "Open your gallery";
   els.open.hidden = false;
   els.open.addEventListener("submit", (e) => {
     e.preventDefault();

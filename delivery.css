@@ -1,5 +1,8 @@
 /* Client photo delivery page (/g/<code>/). Builds on the gallery, lightbox and button styles in style.css. */
 
+/* Parts the script hasn't switched on yet stay hidden, whatever their display style. */
+.delivery-hero [hidden], .delivery-section [hidden] { display: none !important; }
+
 .delivery-hero { padding-bottom: 8px; }
 .delivery-meta { max-width: none; }
 .delivery-expires { font-size: 0.9rem; }
