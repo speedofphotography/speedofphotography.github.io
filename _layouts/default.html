@@ -4,8 +4,6 @@
 {%- if page.content_key %}{% assign pc = c[page.content_key] %}{% elsif page.data_file %}{% assign pc = site.data[page.data_file] %}{% endif -%}
 {%- assign utm_label = site.data.utmedia.nav_label | default: "UTMedia" -%}
 {%- assign book_label = nav.book | default: c.hero.primary_button | default: "Book a shoot" -%}
-{%- comment %} Client galleries (Pixieset) link: hidden until an address is set in _data/client_galleries.yml. {% endcomment -%}
-{%- assign cg = site.data.client_galleries -%}
 <!doctype html>
 <html lang="en">
 <head>
@@ -49,9 +47,6 @@
         <li><a href="{{ base }}/#about">{{ nav.about | default: "About" | escape }}</a></li>
         <li><a href="{{ base }}/portfolio/"{% if page.url == "/portfolio/" %} aria-current="page"{% endif %}>{{ nav.portfolio | default: "Portfolio" | escape }}</a></li>
         <li><a href="{{ base }}/utmedia/"{% if page.url == "/utmedia/" %} aria-current="page"{% endif %}>{{ utm_label | escape }}</a></li>
-        {%- if cg.url and cg.url != "" %}
-        <li><a href="{{ cg.url | escape }}" target="_blank" rel="noopener">{{ cg.label | default: "Client galleries" | escape }}</a></li>
-        {%- endif %}
         <li><a href="{{ base }}/packages/" class="nav-cta"{% if page.url == "/packages/" %} aria-current="page"{% endif %}>{{ book_label | escape }}</a></li>
       </ul>
     </nav>
@@ -71,9 +66,6 @@
         <li><a href="{{ base }}/portfolio/">{{ nav.portfolio | default: "Portfolio" | escape }}</a></li>
         <li><a href="{{ base }}/#services">{{ nav.services | default: "Services" | escape }}</a></li>
         <li><a href="{{ base }}/utmedia/">{{ utm_label | escape }}</a></li>
-        {%- if cg.url and cg.url != "" %}
-        <li><a href="{{ cg.url | escape }}" target="_blank" rel="noopener">{{ cg.label | default: "Client galleries" | escape }}</a></li>
-        {%- endif %}
         <li><a href="{{ base }}/packages/">{{ book_label | escape }}</a></li>
         <li><a href="{{ c.contact.instagram_url | escape }}" target="_blank" rel="noopener">{{ nav.instagram | default: "Instagram" | escape }}</a></li>
         <li><a href="mailto:{{ c.contact.email | escape }}">{{ nav.email | default: "Email" | escape }}</a></li>

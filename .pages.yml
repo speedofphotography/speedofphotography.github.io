@@ -644,18 +644,6 @@ content:
   - name: other_tab
     label: Everything else tab name
     type: string
-- name: client_galleries
-  label: Client galleries link
-  type: file
-  path: _data/client_galleries.yml
-  format: yaml
-  fields:
-  - name: label
-    label: Menu text
-    type: string
-  - name: url
-    label: Your Pixieset client gallery address (e.g. https://yourname.pixieset.com). Leave blank to hide the link.
-    type: string
 - name: utmedia
   label: UTMedia page
   type: file
