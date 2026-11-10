@@ -75,7 +75,8 @@ originals locally, because Cloudflare's resizing only exists on the live site.
    `DELIVERY` pointing at `sop-deliveries`.
 4. Under Images > Transformations, enable `speedofphotography.com`. This gives smaller previews: 5,000 new sizes a
    month free, and each photo uses 2.
-5. Merge the `photo-delivery` branch into `main`.
+5. On `main`, revert commit `b6071b2` (it took the first version off the live site, so a plain merge would
+   leave those files out). Then merge the `photo-delivery` branch into `main`.
 
 ## Limits worth knowing
 
