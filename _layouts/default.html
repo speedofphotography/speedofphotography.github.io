@@ -20,9 +20,11 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,500;0,700;1,700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="{{ base }}/style.css?v=25">
+  {%- comment %} The page-build animation runs on the home page only. {% endcomment %}
+  {%- if page.url == "/" %}
   <script>
-    // Page-build animation: plays on the first page of a visit and every time a page is reloaded (not when clicking
-    // between pages), never for reduced motion. Hides the page until build-fx.js takes over.
+    // Page-build animation (home page only): plays the first time the home page is opened in a visit and every time
+    // it's reloaded (not when clicking back to it), never for reduced motion. Hides the page until build-fx.js takes over.
     (function () {
       try {
         var root = document.documentElement;
@@ -36,6 +38,7 @@
     })();
   </script>
   <link rel="stylesheet" href="{{ base }}/build-fx.css?v=5">
+  {%- endif %}
 </head>
 <body>
   <header class="site-header">
@@ -78,6 +81,8 @@
   </footer>
 
   <script src="{{ base }}/script.js?v=16"></script>
+  {%- if page.url == "/" %}
   <script src="{{ base }}/build-fx.js?v=5"></script>
+  {%- endif %}
 </body>
 </html>
