@@ -644,6 +644,30 @@ content:
   - name: other_tab
     label: Everything else tab name
     type: string
+- name: client_gallery
+  label: Client gallery box (bottom of home page)
+  type: file
+  path: _data/client_gallery.yml
+  format: yaml
+  fields:
+  - name: eyebrow
+    label: Small label
+    type: string
+  - name: heading
+    label: Heading
+    type: string
+  - name: text
+    label: Text under the heading
+    type: text
+  - name: placeholder
+    label: Example shown inside the empty box
+    type: string
+  - name: button
+    label: Button text
+    type: string
+  - name: error
+    label: Message when what they paste isn't a gallery link
+    type: string
 - name: utmedia
   label: UTMedia page
   type: file

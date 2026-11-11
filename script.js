@@ -399,3 +399,25 @@ Suggested by: ${payload.suggested_by}`;
     }
   });
 }
+
+// ---------- Client gallery box (home page): paste a gallery link, go to /g/<code>/ ----------
+const galleryOpen = document.querySelector("[data-gallery-open]");
+if (galleryOpen) {
+  const input = galleryOpen.querySelector("input");
+  const error = galleryOpen.querySelector(".gallery-open-error");
+  galleryOpen.addEventListener("submit", (e) => {
+    e.preventDefault();
+    const raw = input.value.trim();
+    // Accepts the full link (with or without https://, www.) or just the code at the end.
+    let code = (raw.match(/\/g\/([^/?#\s]+)/) || [])[1] || (/^[\w-]+$/.test(raw) ? raw : "");
+    try { code = decodeURIComponent(code); } catch (_) {}
+    if (!/^[A-Za-z0-9][A-Za-z0-9_-]{2,80}$/.test(code)) {
+      error.textContent = galleryOpen.dataset.error;
+      error.hidden = false;
+      input.focus();
+      return;
+    }
+    location.href = `/g/${encodeURIComponent(code)}/`;
+  });
+  input.addEventListener("input", () => { error.hidden = true; });
+}
