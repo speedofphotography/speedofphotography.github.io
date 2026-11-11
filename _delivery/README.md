@@ -44,7 +44,41 @@ Pictures\SOP Deliveries\                  R2 bucket "sop-deliveries"  (not set u
 
 Hidden files (like `.DS_Store`), `gallery.json` itself and anything in sub-folders are never shown.
 
+## SOP Studio: making and managing galleries
+
+Double-click **`Studio.cmd`** in this folder. It opens SOP Studio in your browser at `http://127.0.0.1:4417/`.
+There you can make a gallery (the client link is created for you), drag photos in, change the title, note and
+end date, delete photos, close a gallery early, or delete it. Keep the black window open while you work.
+
+**Why it's safe.** Studio runs only on your computer. The website has no admin page at all, so there is
+nothing online for anyone else to log in to. Studio connects to R2 with an API token that you keep on this PC,
+locked with your passphrase:
+
+- The token is saved in `%APPDATA%\SOP Studio\vault.json`, encrypted (AES-256 with a scrypt key). It is never in
+  this folder, which is public on GitHub.
+- Studio only answers this computer (`127.0.0.1`). Other websites open in your browser can't use it.
+- Five wrong passphrases lock sign-in for 5 minutes, then 10, 20 and so on.
+- It locks itself after 30 minutes without use, and when you close the window.
+- Make the token **Object Read & Write** for the `sop-deliveries` bucket only. Then even the token can't touch
+  anything else in your Cloudflare account.
+
+**First run.** Studio asks for your R2 Account ID, Access Key ID and Secret Access Key, and a new passphrase
+(12+ characters). To get the keys: Cloudflare dashboard > R2 > Manage API tokens > Create API token, choose
+Object Read & Write, apply it to `sop-deliveries` only, create it, and copy the two keys (the secret is shown
+once). Studio checks the keys work before saving them.
+
+**Forgot the passphrase?** Delete `%APPDATA%\SOP Studio\vault.json`, delete the old token in Cloudflare, make a
+new one, and set Studio up again. Your galleries are untouched.
+
+**If a token might have leaked**, delete it in Cloudflare, make a new one, and paste it under Settings > Replace
+R2 keys.
+
+Studio needs Node.js (the LTS version from nodejs.org). It also makes a small preview of each photo in a
+hidden `.thumbs` folder inside the gallery, for its own grid. Clients never see it.
+
 ## Delivering a shoot (once storage is on)
+
+The easy way is SOP Studio (above). To do it by hand instead:
 
 1. Run `new-gallery.ps1` (right-click > Run with PowerShell). Give it the client name and, optionally, the car.
    It creates the folder with a ready `gallery.json` and copies the client link to your clipboard.
