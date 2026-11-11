@@ -140,19 +140,19 @@ photos:
     category: details
     size: tall
   - image: /images/mclaren-720s-spider-seat.jpg
-    caption: McLaren 720S Spider seat
+    caption: McLaren 720S Headrest
     category: interior
     size: tall
   - image: /images/mclaren-720s-spider-interior.jpg
-    caption: McLaren 720S Spider interior
+    caption: McLaren 750S Interior
     category: interior
     size: tall
   - image: /images/lamborghini-revuelto-interior.jpg
-    caption: Lamborghini Revuelto interior
+    caption: Lamborghini Revuelto Interior
     category: interior
     size: tall
   - image: /images/mclaren-675lt-spider-seat.jpg
-    caption: McLaren 675LT Spider seat
+    caption: McLaren 675LT Headrest
     category: interior
     size: tall
   - image: /images/aston-martin-vantage-roadster-interior.jpg
@@ -168,7 +168,7 @@ photos:
     category: interior
     size: tall
   - image: /images/lamborghini-huracan-spyder-seat.jpg
-    caption: Lamborghini Huracán Spyder seat
+    caption: Lamborghini Huracán Spyder Headrest
     category: interior
     size: tall
   - image: /images/mclaren-solus-gt-steering-wheel.jpg
@@ -180,11 +180,11 @@ photos:
     category: interior
     size: tall
   - image: /images/porsche-gt3-rs-mirror-seat.jpg
-    caption: Porsche 911 GT3 RS seat in the mirror
+    caption: Porsche 911 GT3 RS Headrest
     category: interior
     size: tall
   - image: /images/audi-rs3-interior.jpg
-    caption: Audi RS 3 interior
+    caption: Audi RS3 interior
     category: interior
     size: tall
   - image: /images/audi-rs3-seat.jpg
