@@ -1,4 +1,4 @@
-// "Shot in real time" intro, played only on the first page of a visit: little cars drive to each element,
+// "Shot in real time" intro, played on the first page of a visit and on every reload: little cars drive to each element,
 // a viewfinder focuses on it, and it's captured (photos flash into focus, headlines pan in like a slow-shutter shot).
 // Sections below the fold build as they scroll into view.
 // Skipped for people who ask for reduced motion, and visitors can press Skip at any time.

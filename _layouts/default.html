@@ -21,12 +21,15 @@
   <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,500;0,700;1,700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="{{ base }}/style.css?v=25">
   <script>
-    // Page-build animation: first page of a visit only, never for reduced motion. Hides the page until build-fx.js takes over.
+    // Page-build animation: plays on the first page of a visit and every time a page is reloaded (not when clicking
+    // between pages), never for reduced motion. Hides the page until build-fx.js takes over.
     (function () {
       try {
         var root = document.documentElement;
         if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-        if (location.search.indexOf("build") < 0 && sessionStorage.getItem("fx:visit")) return;
+        var nav = performance.getEntriesByType && performance.getEntriesByType("navigation")[0];
+        var reload = nav ? nav.type === "reload" : performance.navigation && performance.navigation.type === 1;
+        if (!reload && location.search.indexOf("build") < 0 && sessionStorage.getItem("fx:visit")) return;
         root.classList.add("fx-hold");
         setTimeout(function () { if (!window.__fx) root.classList.remove("fx-hold"); }, 2500);
       } catch (e) {}
