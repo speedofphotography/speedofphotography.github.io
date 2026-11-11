@@ -20,6 +20,26 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,500;0,700;1,700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="{{ base }}/style.css?v=25">
+  <script>
+    // A reload starts at the top of the page, not wherever the visitor was (or a #section in the address).
+    // Back and forward still return to where they were.
+    (function () {
+      try {
+        var nav = performance.getEntriesByType && performance.getEntriesByType("navigation")[0];
+        var reload = nav ? nav.type === "reload" : performance.navigation && performance.navigation.type === 1;
+        if (!reload || !("scrollRestoration" in history)) return;
+        history.scrollRestoration = "manual";
+        if (location.hash) history.replaceState(history.state, "", location.pathname + location.search);
+        var moved = false; // once the visitor scrolls themselves, leave them be
+        ["wheel", "touchstart", "keydown"].forEach(function (t) { addEventListener(t, function () { moved = true; }, { once: true, passive: true }); });
+        var top = function () { if (!moved) scrollTo({ top: 0, left: 0, behavior: "instant" }); }; // the site scrolls smoothly; this must jump
+        top();
+        addEventListener("DOMContentLoaded", top);
+        addEventListener("load", top);
+        addEventListener("pagehide", function () { history.scrollRestoration = "auto"; });
+      } catch (e) {}
+    })();
+  </script>
   {%- comment %} The page-build animation runs on the home page only. {% endcomment %}
   {%- if page.url == "/" %}
   <script>
