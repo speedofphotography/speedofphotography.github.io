@@ -1,5 +1,5 @@
-// "Shot in real time" intro, home page only, played on the first visit to it and on every reload: a viewfinder focuses
-// on each element (little cars drive to each one in the header and top banner only), and it's captured (photos flash into focus, headlines pan in like a slow-shutter shot).
+// "Shot in real time" intro, home page only, played on the first visit to it and on every reload. In the header and top
+// banner, little cars drive to each element and a viewfinder focuses on it; further down, things just build in place, and it's captured (photos flash into focus, headlines pan in like a slow-shutter shot).
 // Sections below the fold build as they scroll into view.
 // Skipped for people who ask for reduced motion, and visitors can press Skip at any time.
 (function () {
@@ -162,16 +162,18 @@
   // A soft flash, and the photo pulls into focus
   async function capture(el, box) {
     el.classList.remove("fx-wait");
-    const flash = document.createElement("div");
-    flash.className = "fx-flash";
-    box.append(flash);
     const soft = "cubic-bezier(0.25, 0.1, 0.25, 1)";
-    flash.animate([{ opacity: 0 }, { opacity: 0.22, offset: 0.25 }, { opacity: 0 }], { duration: 620, easing: soft });
+    const flash = box && document.createElement("div"); // the flash lives in the focus box, so no box, no flash
+    if (flash) {
+      flash.className = "fx-flash";
+      box.append(flash);
+      flash.animate([{ opacity: 0 }, { opacity: 0.22, offset: 0.25 }, { opacity: 0 }], { duration: 620, easing: soft });
+    }
     await el.animate(
       [{ opacity: 0, filter: "blur(12px) brightness(1.25)", transform: "scale(1.02)" }, { opacity: 1, filter: "blur(0) brightness(1)", transform: "scale(1)" }],
       { duration: 760 * pace(), easing: soft },
     ).finished.catch(() => {});
-    flash.remove();
+    if (flash) flash.remove();
   }
 
   // Blocks glide into place
@@ -183,7 +185,7 @@
     ).finished.catch(() => {});
   }
 
-  // The cars only drive around the menu bar and the top banner; further down, the viewfinder works on its own.
+  // The cars and focus boxes only work the menu bar and the top banner; further down, things just build in place.
   const withCar = (el) => !!el.closest(".site-header, .hero");
 
   const isPhoto = (el) => el.matches(".shot, .about-photo, .location");
@@ -215,10 +217,15 @@
     layer.style.height = `${document.documentElement.scrollHeight}px`; // clips anything that would widen the page on phones
     const inHeader = el.closest(".site-header");
     const top = r.top + (inHeader ? 0 : scrollY);
-    if (withCar(el)) {
-      drive(agent, Math.min(r.left + Math.min(r.width * 0.2, 60), innerWidth - 80), top + Math.min(r.height * 0.5, 40), p);
-      await sleep(380 * p);
+    if (!withCar(el)) {
+      if (isPhoto(el)) await capture(el, null);
+      else if (isText(el)) await pan(el);
+      else await roll(el);
+      tick();
+      return;
     }
+    drive(agent, Math.min(r.left + Math.min(r.width * 0.2, 60), innerWidth - 80), top + Math.min(r.height * 0.5, 40), p);
+    await sleep(380 * p);
 
     const box = document.createElement("div");
     box.className = "fx-box";
