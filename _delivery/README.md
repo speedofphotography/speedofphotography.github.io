@@ -46,7 +46,12 @@ Hidden files (like `.DS_Store`), `gallery.json` itself and anything in sub-folde
 
 ## SOP Studio: making and managing galleries
 
-Double-click **`Studio.cmd`** in this folder. It opens SOP Studio in your browser at `http://127.0.0.1:4417/`.
+**Install it** by running `install-studio.ps1` (right-click > Run with PowerShell). It copies Studio to
+`%LOCALAPPDATA%\Programs\SOP Studio` and adds a **SOP Studio** icon to the Desktop and Start menu. Run it again
+after Studio changes to update the installed copy; your saved keys and passphrase are kept. To uninstall, delete
+that folder and the two shortcuts (and `%APPDATA%\SOP Studio` to forget the keys).
+
+Open it from the icon, or double-click **`Studio.cmd`** in this folder. It opens SOP Studio in your browser at `http://127.0.0.1:4417/`.
 There you can make a gallery (the client link is created for you), drag photos in, change the title, note and
 end date, delete photos, close a gallery early, or delete it. Keep the black window open while you work.
 

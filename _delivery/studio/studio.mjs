@@ -15,10 +15,14 @@ import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import * as vault from "./vault.mjs";
 import { createR2, R2Error } from "./r2.mjs";
-import { CODE_RE, META_FILE, typeOf, kindOf, isClientFile, readMeta, isExpired } from "../../_functions_lib/delivery.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repo = path.resolve(here, "..", "..");
+// Installed (install-studio.ps1), the app carries its own copy of the site's gallery rules and logo;
+// run from the website folder, it uses the originals.
+const installed = fs.existsSync(path.join(here, "lib", "delivery.js"));
+const { CODE_RE, META_FILE, typeOf, kindOf, isClientFile, readMeta, isExpired } =
+  await import(installed ? "./lib/delivery.js" : "../../_functions_lib/delivery.js");
 const SITE = "https://speedofphotography.com";
 const IDLE_MS = 30 * 60 * 1000;
 const MAX_FILE = 4.9 * 1024 ** 3; // R2's limit for a single upload is 5 GB
@@ -85,7 +89,7 @@ const STATIC = {
   "/": ["app.html", "text/html; charset=utf-8"],
   "/app.css": ["app.css", "text/css; charset=utf-8"],
   "/app.js": ["app.js", "text/javascript; charset=utf-8"],
-  "/logo.png": [path.join(repo, "images", "logo-small.png"), "image/png"],
+  "/logo.png": [installed ? path.join(here, "logo.png") : path.join(repo, "images", "logo-small.png"), "image/png"],
 };
 
 function cookieToken(req) {
