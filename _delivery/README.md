@@ -76,7 +76,9 @@ originals locally, because Cloudflare's resizing only exists on the live site.
 4. Under Images > Transformations, enable `speedofphotography.com`. This gives smaller previews: 5,000 new sizes a
    month free, and each photo uses 2.
 5. On `main`, revert commit `b6071b2` (it took the first version off the live site, so a plain merge would
-   leave those files out). Then merge the `photo-delivery` branch into `main`.
+   leave those files out). Then merge the `photo-delivery` branch into `main`. The home page "paste your gallery
+   link" box is already live (commit `03440a5` on `main`, same content as `d56e6cd` here), so expect small,
+   same-on-both-sides conflicts in `style.css` and `_layouts/default.html`.
 
 ## Limits worth knowing
 
