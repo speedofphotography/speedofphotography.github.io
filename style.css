@@ -648,7 +648,8 @@ h1, h2, h3 {
 }
 .socials {
   display: flex;
-  gap: 24px;
+  flex-wrap: wrap; /* on phones the links would otherwise push the page wider than the screen */
+  gap: 12px 24px;
   list-style: none;
   margin: 0;
   padding: 0;
