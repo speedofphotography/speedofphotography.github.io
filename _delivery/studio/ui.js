@@ -65,7 +65,9 @@ export function day(iso, withYear = true) {
   if (!m) return "";
   const opts = { month: "short", day: "numeric" };
   if (withYear) opts.year = "numeric";
-  return new Date(+m[1], m[2] - 1, +m[3]).toLocaleDateString(undefined, opts);
+  // A full timestamp ("…T…Z") is shown in local time; a plain date is shown as written.
+  const when = iso.length > 10 && iso.includes("T") ? new Date(iso) : new Date(+m[1], m[2] - 1, +m[3]);
+  return when.toLocaleDateString(undefined, opts);
 }
 export function weekday(iso) {
   const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso || "");

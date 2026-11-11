@@ -1,0 +1,16 @@
+# Extra boxes on the booking form (Packages page). The other labels are under Contact in the main content file.
+# Each answer also fills in the matching box in SOP Studio's client records.
+phone_label: Phone (optional)
+instagram_label: Instagram (optional)
+instagram_placeholder: "@yourhandle"
+date_label: Preferred date (optional)
+location_label: Location (optional)
+location_placeholder: Where you'd like to shoot, or "not sure"
+source_label: How did you hear about me?
+sources:
+- Instagram
+- Google or the website
+- A friend or past client
+- A car meet or event
+- I've booked before
+- Other

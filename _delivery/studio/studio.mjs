@@ -31,7 +31,7 @@ const MAX_THUMB = 2 * 1024 * 1024;
 const THUMBS = ".thumbs"; // small previews for this app only; the client page never lists sub-folders
 const ARGS = new Set(process.argv.slice(2));
 
-const state = { r2: null, crm: null, bucket: "", session: "", seen: 0, fails: 0, lockUntil: 0, checking: false };
+const state = { r2: null, crm: null, inboxKey: "", bucket: "", session: "", seen: 0, fails: 0, lockUntil: 0, checking: false };
 
 function lock() {
   const { r2, crm: store } = state;
@@ -47,15 +47,56 @@ function connect(secrets) {
   lock();
   state.r2 = createR2({ ...secrets, endpoint: process.env.SOP_STUDIO_ENDPOINT });
   state.crm = crm.createStore(state.r2, Buffer.from(secrets.dataKey, "base64"));
+  state.inboxKey = secrets.inboxKey;
   state.bucket = secrets.bucket;
+  publishInboxKey(state.r2, secrets.inboxKey);
 }
 
 const newDataKey = () => crypto.randomBytes(32).toString("base64");
 
-// Keeps R2's passphrase-locked copy of the client-records key current (see crm.mjs). Runs in the background.
-function shareKey(r2, pass, dataKey) {
-  vault.seal(pass, { dataKey }).then((sealed) => r2.put(crm.REMOTE_KEY, sealed, "application/json"))
+// The key pair for website bookings: the website encrypts each booking with the public half
+// (functions/api/booking.js); only this app, unlocked, has the private half to read them.
+const INBOX_PUBLIC = "_studio/inbox-public.json";
+const newInboxKey = () => crypto.generateKeyPairSync("rsa", { modulusLength: 3072 })
+  .privateKey.export({ type: "pkcs8", format: "pem" });
+
+// Makes sure the saved keys include both; returns true if it had to add one.
+function fillKeys(secrets, from = {}) {
+  let added = false;
+  if (!secrets.dataKey) { secrets.dataKey = from.dataKey || newDataKey(); added = !from.dataKey; }
+  if (!secrets.inboxKey) { secrets.inboxKey = from.inboxKey || newInboxKey(); added = added || !from.inboxKey; }
+  return added;
+}
+
+// Keeps R2's passphrase-locked copy of the keys current (see crm.mjs), so another PC with the same passphrase
+// can read the records and waiting bookings. Runs in the background.
+function shareKey(r2, pass, secrets) {
+  vault.seal(pass, { dataKey: secrets.dataKey, inboxKey: secrets.inboxKey })
+    .then((sealed) => r2.put(crm.REMOTE_KEY, sealed, "application/json"))
     .catch((e) => console.error("Couldn't back up the records key:", e.message));
+}
+
+// Puts the public half of the bookings key where the website can find it (only if it changed).
+function publishInboxKey(r2, privatePem) {
+  const jwk = { ...crypto.createPublicKey(privatePem).export({ format: "jwk" }), alg: "RSA-OAEP-256", key_ops: ["encrypt"], ext: true };
+  const body = JSON.stringify(jwk);
+  r2.getText(INBOX_PUBLIC).then((t) => (t === body ? null : r2.put(INBOX_PUBLIC, body, "application/json")))
+    .catch((e) => console.error("Couldn't publish the bookings key:", e.message));
+}
+
+// Opens one stored booking: the RSA private key unlocks its AES key, which unlocks the booking.
+function openBooking(privatePem, stored) {
+  try {
+    const o = JSON.parse(stored);
+    const aes = crypto.privateDecrypt({ key: privatePem, padding: crypto.constants.RSA_PKCS1_OAEP_PADDING, oaepHash: "sha256" },
+      Buffer.from(o.key, "base64"));
+    const all = Buffer.from(o.data, "base64");
+    const d = crypto.createDecipheriv("aes-256-gcm", aes, Buffer.from(o.iv, "base64"));
+    d.setAuthTag(all.subarray(all.length - 16));
+    return JSON.parse(Buffer.concat([d.update(all.subarray(0, all.length - 16)), d.final()]).toString("utf8"));
+  } catch {
+    return null;
+  }
 }
 
 // ---------- HTTP basics ----------
@@ -230,14 +271,14 @@ const api = {
     let restored = false;
     try {
       await test.list({ max: 1 });
-      if (old) secrets.dataKey = old.dataKey || newDataKey();
+      if (old) fillKeys(secrets, old);
       else {
         // Client records already in R2 from an earlier setup? Same passphrase unlocks them again.
         const sealed = await test.getText(crm.REMOTE_KEY);
         const found = sealed ? await vault.unseal(pass, sealed) : null;
-        if (found?.dataKey) { secrets.dataKey = found.dataKey; restored = true; }
+        if (found?.dataKey) { fillKeys(secrets, found); restored = true; }
         else {
-          secrets.dataKey = newDataKey();
+          fillKeys(secrets);
           if (sealed) await setAside(test); // locked with a different passphrase: keep it, out of the way
         }
         moveLocalRecordsAside(restored);
@@ -247,7 +288,7 @@ const api = {
 
     await vault.save(pass, secrets);
     connect(secrets);
-    shareKey(state.r2, pass, secrets.dataKey);
+    shareKey(state.r2, pass, secrets);
     startSession(res, { ok: true, restored });
   },
 
@@ -268,13 +309,12 @@ const api = {
       await new Promise((r) => setTimeout(r, 1000));
       return fail(res, 401, "That passphrase isn't right.");
     }
-    if (!secrets.dataKey) {
-      secrets.dataKey = newDataKey();
-      await vault.save(passphrase, secrets);
-    }
+    const added = fillKeys(secrets);
+    if (added) await vault.save(passphrase, secrets);
     connect(secrets);
     const r2 = state.r2;
-    r2.getText(crm.REMOTE_KEY).then((t) => { if (!t) shareKey(r2, passphrase, secrets.dataKey); }).catch(() => {});
+    if (added) shareKey(r2, passphrase, secrets);
+    else r2.getText(crm.REMOTE_KEY).then((t) => { if (!t) shareKey(r2, passphrase, secrets); }).catch(() => {});
     startSession(res, { ok: true });
   },
 
@@ -289,8 +329,30 @@ const api = {
     const secrets = typeof current === "string" ? await vault.open(current) : null;
     if (!secrets) return fail(res, 401, "The current passphrase isn't right.");
     await vault.save(next, secrets);
-    shareKey(state.r2, next, secrets.dataKey);
+    shareKey(state.r2, next, secrets);
     send(res, 200, { ok: true });
+  },
+
+  // New website bookings waiting in the bucket, opened. Studio adds them to the records, then calls inboxDone.
+  async inbox(req, res) {
+    const { objects } = await state.r2.list({ prefix: "_inbox/", max: 100 });
+    const bookings = [];
+    let unreadable = 0;
+    await eachLimit(objects.filter((o) => /^_inbox\/[\w-]+\.json$/.test(o.key)), 6, async (o) => {
+      const raw = await state.r2.getText(o.key);
+      const b = raw && openBooking(state.inboxKey, raw);
+      if (b) bookings.push({ key: o.key, booking: b });
+      else unreadable++;
+    });
+    bookings.sort((a, b) => a.key.localeCompare(b.key));
+    send(res, 200, { bookings, unreadable });
+  },
+
+  async inboxDone(req, res) {
+    const { keys } = await readJson(req);
+    const list = (Array.isArray(keys) ? keys : []).filter((k) => typeof k === "string" && /^_inbox\/[\w-]+\.json$/.test(k));
+    await eachLimit(list, 6, (k) => state.r2.del(k));
+    send(res, 200, { deleted: list.length });
   },
 
   async getCrm(req, res) {
@@ -415,6 +477,8 @@ async function route(req, res, url) {
 
   if (!signedIn(req)) return fail(res, 401, "Signed out.");
   if (pathname === "/api/passphrase" && m === "POST") return api.passphrase(req, res);
+  if (pathname === "/api/inbox" && m === "GET") return api.inbox(req, res);
+  if (pathname === "/api/inbox/done" && m === "POST") return api.inboxDone(req, res);
   if (pathname === "/api/crm" && m === "GET") return api.getCrm(req, res);
   if (pathname === "/api/crm" && m === "PUT") return api.saveCrm(req, res);
   if (pathname === "/api/albums" && m === "GET") return api.listAlbums(req, res);

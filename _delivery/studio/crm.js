@@ -53,6 +53,60 @@ const byDateDesc = (a, b) => (b.date || "").localeCompare(a.date || "");
 const shootsOf = (clientId) => doc.shoots.filter((s) => s.clientId === clientId).sort(byDateDesc);
 export const carsOf = (c) => (c?.cars || "").split(/\n|,/).map((s) => s.trim()).filter(Boolean);
 export const shootForGallery = (code) => doc?.shoots.find((s) => s.gallery === code);
+// ---------- website bookings ----------
+// Requests from the booking form wait (encrypted) in the bucket. This adds each one to the records: the client
+// (matched by email, phone or Instagram, or added new), an Inquiry shoot, a note, and a follow-up to reply today.
+// Returns how many were added. Safe to run twice: each booking remembers where it came from.
+const digits = (v) => (v || "").replace(/\D/g, "");
+const handle = (v) => (v || "").trim().replace(/^https?:\/\/(www\.)?instagram\.com\//i, "").replace(/[/?#].*$/, "").replace(/^@/, "").toLowerCase();
+
+export async function importBookings() {
+  const { bookings } = await api("GET", "/api/inbox");
+  if (!bookings.length) return 0;
+  await load();
+  let added = 0;
+  for (const { key, booking: b } of bookings) {
+    if (doc.shoots.some((s) => s.bookingId === key)) continue;
+    const email = (b.email || "").trim().toLowerCase();
+    const phone = digits(b.phone);
+    const ig = handle(b.instagram);
+    let c = doc.clients.find((x) => email && (x.email || "").toLowerCase() === email)
+      || doc.clients.find((x) => phone.length >= 7 && digits(x.phone) === phone)
+      || doc.clients.find((x) => ig && handle(x.instagram) === ig);
+    if (!c) {
+      c = { id: newId(), name: b.name || "Website booking", email: b.email || "", phone: b.phone || "", instagram: ig, cars: "",
+        source: b.source || "Website booking form", notes: "", created: b.received || now() };
+      doc.clients.push(c);
+    } else {
+      // Fill in what's missing; never overwrite what you've already entered.
+      if (!c.email && b.email) c.email = b.email;
+      if (!c.phone && b.phone) c.phone = b.phone;
+      if (!c.instagram && ig) c.instagram = ig;
+      if (!c.source && b.source) c.source = b.source;
+    }
+    if (b.car && !carsOf(c).some((x) => x.toLowerCase() === b.car.toLowerCase())) c.cars = [...carsOf(c), b.car].join("\n");
+
+    const pkg = [b.type, (b.addons || []).length ? `add-ons: ${b.addons.join(", ")}` : ""].filter(Boolean).join(" + ");
+    const s = { id: newId(), clientId: c.id, car: b.car || "", title: "", date: b.date || "", time: "", location: b.location || "",
+      package: pkg, status: "inquiry", payment: "unpaid", amount: "", gallery: "", notes: b.message || "",
+      created: b.received || now(), bookingId: key };
+    doc.shoots.push(s);
+    const summary = [
+      "Booking request from the website.",
+      b.type && `Shoot type: ${b.type}`, (b.addons || []).length && `Add-ons: ${b.addons.join(", ")}`,
+      b.date && `Preferred date: ${day(b.date)}`, b.location && `Location: ${b.location}`,
+      b.source && `Heard about you through: ${b.source}`, b.message && `\n${b.message}`,
+    ].filter(Boolean).join("\n");
+    doc.notes.push({ id: newId(), clientId: c.id, shootId: s.id, at: b.received || now(), kind: "message", text: summary });
+    doc.tasks.push({ id: newId(), clientId: c.id, shootId: s.id, due: today(), text: `Reply to ${c.name.split(" ")[0]}'s booking request`, done: false, doneAt: "" });
+    added++;
+  }
+  if (added) await save();
+  // Only now that they're saved in the records, remove them from the bucket.
+  await api("POST", "/api/inbox/done", { keys: bookings.map((x) => x.key) });
+  return added;
+}
+
 // After a gallery is deleted, shoots no longer point at it.
 export async function unlinkGallery(code) {
   await load();
@@ -411,6 +465,7 @@ export async function shootScreen(id, { createGallery, loadAlbums }) {
     ["Package", s.package || "Not set"],
     ["Payment", `${label(PAYMENT, s.payment)}${s.amount ? ` · ${s.amount}` : ""}`],
   ];
+  if (s.bookingId) facts.push(["Came in", `Website booking form, ${day(s.created)}`]);
   show(
     back("#/shoots", "Shoots"),
     h("div", { class: "head" }, h("div", {}, h("h1", {}, s.car || shootName(s)),

@@ -363,8 +363,27 @@ async function start() {
   if (!info.signedIn) { crm.forget(); dropAlbums(); }
   if (!info.setup) return setupScreen();
   if (!info.signedIn) return loginScreen();
+  await checkBookings(false);
   route();
 }
+
+// Collects new requests from the website's booking form into the records: on sign-in and every 5 minutes.
+let checking = false;
+async function checkBookings(rerender = true) {
+  if (checking || !info.signedIn) return;
+  checking = true;
+  try {
+    const added = await crm.importBookings();
+    if (added) {
+      toast(`${added === 1 ? "A new booking request" : `${added} new booking requests`} came in from the website.`);
+      const path = location.hash.slice(1).split("?")[0] || "/";
+      if (rerender && (path === "/" || path === "/shoots" || path === "/clients")) route();
+    }
+  } catch (e) {
+    if (!(e instanceof Locked)) console.warn("Couldn't check for bookings:", e.message);
+  } finally { checking = false; }
+}
+setInterval(checkBookings, 5 * 60 * 1000);
 
 async function route() {
   if (!info.signedIn) return;

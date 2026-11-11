@@ -52,7 +52,7 @@ const SCHEMA = {
     source: str(60), notes: str(5000), created: str(40) },
   shoots: { id: ID, clientId: ID, car: str(120), title: str(160), date: str(10), time: str(10), location: str(200),
     package: str(120), status: oneOf(STATUSES), payment: oneOf(PAYMENTS), amount: str(40), gallery: str(90),
-    notes: str(5000), created: str(40) },
+    notes: str(5000), created: str(40), bookingId: str(80) },
   notes: { id: ID, clientId: ID, shootId: ID, at: str(40), kind: oneOf(NOTE_KINDS), text: str(5000) },
   tasks: { id: ID, clientId: ID, shootId: ID, due: str(10), text: str(500), done: (v) => v === true, doneAt: str(40) },
 };

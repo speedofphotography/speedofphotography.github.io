@@ -9,6 +9,7 @@ permalink: /packages/
 {%- assign base = site.baseurl -%}
 {%- assign pk = c.packages -%}
 {%- assign fm = c.contact.form -%}
+{%- assign bf = site.data.booking_form -%}
     <section class="page-hero{% if pk.banner and pk.banner != "" %} has-banner{% endif %}"{% if pk.banner and pk.banner != "" %} style="--banner:url('{{ base }}{{ pk.banner }}')"{% endif %}>
       <div class="page-hero-inner">
         <p class="eyebrow">{{ pk.eyebrow | escape }}</p>
@@ -212,6 +213,14 @@ permalink: /packages/
           <input id="email" name="email" type="email" autocomplete="email" required>
         </div>
         <div class="field">
+          <label for="phone">{{ bf.phone_label | default: "Phone (optional)" | escape }}</label>
+          <input id="phone" name="phone" type="tel" autocomplete="tel" maxlength="40">
+        </div>
+        <div class="field">
+          <label for="instagram">{{ bf.instagram_label | default: "Instagram (optional)" | escape }}</label>
+          <input id="instagram" name="instagram" type="text" maxlength="80" autocapitalize="off" spellcheck="false" placeholder="{{ bf.instagram_placeholder | escape }}">
+        </div>
+        <div class="field">
           <label for="car">{{ fm.car_label | default: "Car" | escape }}</label>
           <input id="car" name="car" type="text" placeholder="{{ fm.car_placeholder | escape }}">
         </div>
@@ -222,6 +231,23 @@ permalink: /packages/
             <option>{{ t | escape }}</option>
             {%- endfor %}
           </select>
+        </div>
+        <div class="field">
+          <label for="date">{{ bf.date_label | default: "Preferred date (optional)" | escape }}</label>
+          <input id="date" name="date" type="date">
+        </div>
+        <div class="field">
+          <label for="source">{{ bf.source_label | default: "How did you hear about me?" | escape }}</label>
+          <select id="source" name="source">
+            <option value="">Choose one</option>
+            {%- for o in bf.sources %}
+            <option>{{ o | escape }}</option>
+            {%- endfor %}
+          </select>
+        </div>
+        <div class="field field-full">
+          <label for="location">{{ bf.location_label | default: "Location (optional)" | escape }}</label>
+          <input id="location" name="location" type="text" maxlength="200" placeholder="{{ bf.location_placeholder | escape }}">
         </div>
         {%- if c.packages.addons.size > 0 %}
         <fieldset class="field field-full addon-choices">

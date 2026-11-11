@@ -668,6 +668,37 @@ content:
   - name: error
     label: Message when what they paste isn't a gallery link
     type: string
+- name: booking_form
+  label: Booking form extra boxes (Packages page)
+  type: file
+  path: _data/booking_form.yml
+  format: yaml
+  fields:
+  - name: phone_label
+    label: Phone label
+    type: string
+  - name: instagram_label
+    label: Instagram label
+    type: string
+  - name: instagram_placeholder
+    label: Example shown inside the empty Instagram box
+    type: string
+  - name: date_label
+    label: Preferred date label
+    type: string
+  - name: location_label
+    label: Location label
+    type: string
+  - name: location_placeholder
+    label: Example shown inside the empty Location box
+    type: string
+  - name: source_label
+    label: '"How did you hear about me?" label'
+    type: string
+  - name: sources
+    label: '"How did you hear about me?" choices'
+    type: string
+    list: true
 - name: utmedia
   label: UTMedia page
   type: file

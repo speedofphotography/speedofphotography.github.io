@@ -65,6 +65,16 @@ end date, delete photos, close a gallery early, or delete it. Keep the black win
   location, package, payment and a private amount. "Create gallery for this shoot" makes the gallery with the
   title and dates filled in and links it; "Email link" opens a ready-made email to the client.
 
+**Website bookings come in by themselves.** Every request from the booking form on the Packages page is still
+emailed to you, and a copy is stored, encrypted, in the bucket (`_inbox/`, by `functions/api/booking.js`). The
+website locks it with a public key Studio puts at `_studio/inbox-public.json`; only Studio, unlocked, has the
+private key. When you open Studio (and every 5 minutes while it's open) it collects new requests: it matches the
+client by email, phone or Instagram (or adds them), fills in only details you hadn't entered, adds the car, makes
+an Inquiry shoot with the date, location, shoot type and add-ons, saves the message as a note, adds a "Reply to …"
+follow-up for today, and then deletes the request from the bucket. Until Studio has been opened once, requests
+are only emailed. The extra form labels and the "How did you hear about me?" choices are in Pages CMS under
+"Booking form extra boxes".
+
 The records are encrypted on this PC (`%APPDATA%\SOP Studio\crm.enc`, plus a daily copy for 30 days in
 `backups\`), and an encrypted copy is kept in the bucket (`_studio/`, which the gallery pages can never serve).
 Set Studio up on another computer with the same passphrase and the records come back.

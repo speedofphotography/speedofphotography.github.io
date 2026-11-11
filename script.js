@@ -194,6 +194,13 @@ function setStatus(kind, html) {
   statusEl.innerHTML = html;
 }
 
+// No booking dates in the past.
+const dateBox = form.querySelector('input[name="date"]');
+if (dateBox) {
+  const d = new Date();
+  dateBox.min = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
 form.addEventListener("submit", async (e) => {
   e.preventDefault();
   const data = new FormData(form);
@@ -203,30 +210,50 @@ form.addEventListener("submit", async (e) => {
   const payload = {
     name: data.get("name"),
     email: data.get("email"),
+    phone: data.get("phone") || "Not given",
+    instagram: data.get("instagram") || "Not given",
     car: data.get("car") || "Not given",
     shoot_type: data.get("type"),
+    preferred_date: data.get("date") || "Not given",
+    location: data.get("location") || "Not given",
+    heard_about: data.get("source") || "Not given",
     add_ons: data.getAll("addons").join(", ") || "None",
     details: data.get("message") || "None",
     _subject: subject,
     _template: "table",
     _replyto: data.get("email"),
   };
+  // The same answers, for SOP Studio's client records (stored encrypted until Studio collects them).
+  const booking = {
+    name: data.get("name"), email: data.get("email"), phone: data.get("phone"), instagram: data.get("instagram"),
+    car: data.get("car"), type: data.get("type"), addons: data.getAll("addons"), date: data.get("date"),
+    location: data.get("location"), source: data.get("source"), message: data.get("message"),
+  };
 
   submitBtn.disabled = true;
   submitBtn.textContent = form.dataset.sending;
   setStatus("pending", "");
 
-  try {
-    const res = await fetch(FORM_ENDPOINT, {
-      method: "POST",
-      // FormSubmit treats each referring page address as a separate form needing activation.
-      // Sending only the site origin keeps one activation valid for every page, query string or hash.
-      referrerPolicy: "origin",
-      headers: { "Content-Type": "application/json", Accept: "application/json" },
-      body: JSON.stringify(payload),
-    });
+  const emailed = fetch(FORM_ENDPOINT, {
+    method: "POST",
+    // FormSubmit treats each referring page address as a separate form needing activation.
+    // Sending only the site origin keeps one activation valid for every page, query string or hash.
+    referrerPolicy: "origin",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify(payload),
+  }).then(async (res) => {
     const result = await res.json().catch(() => ({}));
     if (!res.ok || String(result.success) === "false") throw new Error(result.message || res.statusText);
+  });
+  const recorded = fetch("/api/booking", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(booking),
+  }).then((res) => { if (!res.ok) throw new Error(res.statusText); });
+
+  try {
+    // The request has reached me if either the email or the client-records copy got through.
+    await Promise.any([emailed, recorded]);
     form.reset();
     statusEl.className = "form-status is-success";
     statusEl.textContent = form.dataset.success;
