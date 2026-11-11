@@ -1,5 +1,5 @@
-// "Shot in real time" intro, home page only, played on the first visit to it and on every reload: little cars drive to each element,
-// a viewfinder focuses on it, and it's captured (photos flash into focus, headlines pan in like a slow-shutter shot).
+// "Shot in real time" intro, home page only, played on the first visit to it and on every reload: a viewfinder focuses
+// on each element (little cars drive to each one in the header and top banner only), and it's captured (photos flash into focus, headlines pan in like a slow-shutter shot).
 // Sections below the fold build as they scroll into view.
 // Skipped for people who ask for reduced motion, and visitors can press Skip at any time.
 (function () {
@@ -183,6 +183,9 @@
     ).finished.catch(() => {});
   }
 
+  // The cars only drive around the menu bar and the top banner; further down, the viewfinder works on its own.
+  const withCar = (el) => !!el.closest(".site-header, .hero");
+
   const isPhoto = (el) => el.matches(".shot, .about-photo, .location");
   const isText = (el) => /^(H[1-3]|P)$/.test(el.tagName) && !el.querySelector("a, button");
 
@@ -212,8 +215,10 @@
     layer.style.height = `${document.documentElement.scrollHeight}px`; // clips anything that would widen the page on phones
     const inHeader = el.closest(".site-header");
     const top = r.top + (inHeader ? 0 : scrollY);
-    drive(agent, Math.min(r.left + Math.min(r.width * 0.2, 60), innerWidth - 80), top + Math.min(r.height * 0.5, 40), p);
-    await sleep(380 * p);
+    if (withCar(el)) {
+      drive(agent, Math.min(r.left + Math.min(r.width * 0.2, 60), innerWidth - 80), top + Math.min(r.height * 0.5, 40), p);
+      await sleep(380 * p);
+    }
 
     const box = document.createElement("div");
     box.className = "fx-box";
@@ -263,7 +268,8 @@
   }
 
   async function work(agent, el) {
-    if (!agent.el.classList.contains("on")) dress(agent); // a parked car swaps out, so every car gets a turn
+    if (!withCar(el)) agent.el.classList.remove("on"); // past the banner: the car drives off, its slot keeps working
+    else if (!agent.el.classList.contains("on")) dress(agent); // a parked car swaps out, so every car gets a turn
     agent.busy = true;
     await build(agent, el, pace());
     agent.busy = false;
