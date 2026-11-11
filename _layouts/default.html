@@ -20,6 +20,13 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,500;0,700;1,700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="{{ base }}/style.css?v=25">
+  {%- if page.noindex %}
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="referrer" content="no-referrer">
+  {%- endif %}
+  {%- for href in page.styles %}
+  <link rel="stylesheet" href="{{ base }}{{ href }}">
+  {%- endfor %}
   <script>
     // A reload starts at the top of the page, not wherever the visitor was (or a #section in the address).
     // Back and forward still return to where they were.
@@ -104,5 +111,8 @@
   {%- if page.url == "/" %}
   <script src="{{ base }}/build-fx.js?v=7"></script>
   {%- endif %}
+  {%- for src in page.scripts %}
+  <script src="{{ base }}{{ src }}"></script>
+  {%- endfor %}
 </body>
 </html>
