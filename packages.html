@@ -246,8 +246,21 @@ permalink: /packages/
           </select>
         </div>
         <div class="field field-full">
-          <label for="location">{{ bf.location_label | default: "Location (optional)" | escape }}</label>
-          <input id="location" name="location" type="text" maxlength="200" placeholder="{{ bf.location_placeholder | escape }}">
+          <label for="location-pick">{{ bf.location_label | default: "Location (optional)" | escape }}</label>
+          {%- comment %} The choices are the spots in the Locations section above (main places, then "other places"). {% endcomment %}
+          {%- assign ml = site.data.more_locations %}
+          <select id="location-pick" name="location_pick">
+            <option value="">{{ bf.location_choose | default: "Choose a spot" | escape }}</option>
+            {%- for pl in c.locations.places %}{% if pl.name and pl.name != "" %}
+            <option>{{ pl.name | escape }}</option>
+            {%- endif %}{% endfor %}
+            {%- for s in ml.spots %}{% assign sname = s.name | default: s %}{% if sname and sname != "" %}
+            <option>{{ sname | escape }}</option>
+            {%- endif %}{% endfor %}
+            <option value="other">{{ bf.location_other | default: "Somewhere else (I'll type it)" | escape }}</option>
+            <option value="unsure">{{ bf.location_unsure | default: "I don't know yet" | escape }}</option>
+          </select>
+          <input id="location" name="location" type="text" maxlength="200" placeholder="{{ bf.location_placeholder | escape }}" aria-label="{{ bf.location_other | default: "Somewhere else" | escape }}" hidden>
         </div>
         {%- if c.packages.addons.size > 0 %}
         <fieldset class="field field-full addon-choices">

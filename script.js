@@ -194,6 +194,26 @@ function setStatus(kind, html) {
   statusEl.innerHTML = html;
 }
 
+// Location: a spot from the list, "somewhere else" (shows a box to type it), or "I don't know yet".
+const locationPick = form.querySelector('select[name="location_pick"]');
+const locationBox = form.querySelector('input[name="location"]');
+const showLocationBox = () => {
+  const other = locationPick.value === "other";
+  locationBox.hidden = !other;
+  locationBox.required = other;
+};
+if (locationPick && locationBox) {
+  locationPick.addEventListener("change", () => { showLocationBox(); if (!locationBox.hidden) locationBox.focus(); });
+  form.addEventListener("reset", () => setTimeout(showLocationBox));
+}
+const chosenLocation = (data) => {
+  const pick = data.get("location_pick");
+  if (!locationPick) return data.get("location") || "";
+  if (pick === "other") return (data.get("location") || "").trim();
+  if (pick === "unsure") return "Not decided yet";
+  return pick || "";
+};
+
 // No booking dates in the past.
 const dateBox = form.querySelector('input[name="date"]');
 if (dateBox) {
@@ -215,7 +235,7 @@ form.addEventListener("submit", async (e) => {
     car: data.get("car") || "Not given",
     shoot_type: data.get("type"),
     preferred_date: data.get("date") || "Not given",
-    location: data.get("location") || "Not given",
+    location: chosenLocation(data) || "Not given",
     heard_about: data.get("source") || "Not given",
     add_ons: data.getAll("addons").join(", ") || "None",
     details: data.get("message") || "None",
@@ -227,7 +247,7 @@ form.addEventListener("submit", async (e) => {
   const booking = {
     name: data.get("name"), email: data.get("email"), phone: data.get("phone"), instagram: data.get("instagram"),
     car: data.get("car"), type: data.get("type"), addons: data.getAll("addons"), date: data.get("date"),
-    location: data.get("location"), source: data.get("source"), message: data.get("message"),
+    location: chosenLocation(data), source: data.get("source"), message: data.get("message"),
   };
 
   submitBtn.disabled = true;

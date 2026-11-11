@@ -689,8 +689,17 @@ content:
   - name: location_label
     label: Location label
     type: string
+  - name: location_choose
+    label: 'Location list: first line (before anything is picked)'
+    type: string
+  - name: location_other
+    label: 'Location list: "somewhere else" choice (shows a box to type in)'
+    type: string
   - name: location_placeholder
-    label: Example shown inside the empty Location box
+    label: Example shown inside the "somewhere else" box
+    type: string
+  - name: location_unsure
+    label: 'Location list: "I don''t know yet" choice'
     type: string
   - name: source_label
     label: '"How did you hear about me?" label'

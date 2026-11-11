@@ -5,7 +5,10 @@ instagram_label: Instagram (optional)
 instagram_placeholder: "@yourhandle"
 date_label: Preferred date (optional)
 location_label: Location (optional)
-location_placeholder: Where you'd like to shoot, or "not sure"
+location_choose: Choose a spot
+location_other: Somewhere else (I'll type it)
+location_placeholder: Name or address of the spot
+location_unsure: I don't know yet
 source_label: How did you hear about me?
 sources:
 - Instagram
