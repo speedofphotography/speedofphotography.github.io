@@ -99,6 +99,23 @@ layout: default
       </div>
     </section>
 
+    {%- assign cg = site.data.client_gallery %}
+    <section id="client-gallery" class="section gallery-access">
+      <div class="section-head">
+        <p class="eyebrow">{{ cg.eyebrow | default: "Client galleries" | escape }}</p>
+        <h2>{{ cg.heading | default: "Recently finished a shoot with me?" | escape }}</h2>
+        <p class="section-sub">{{ cg.text | default: "Paste the gallery link I sent you below to view your files!" | escape }}</p>
+      </div>
+      <form class="gallery-open" data-gallery-open data-error="{{ cg.error | default: "That doesn't look like a gallery link. Paste the whole link from my message." | escape }}" novalidate>
+        <label class="sr-only" for="gallery-link">Gallery link</label>
+        <div class="gallery-open-row">
+          <input id="gallery-link" name="link" type="text" inputmode="url" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="{{ cg.placeholder | default: "speedofphotography.com/g/your-code" | escape }}">
+          <button type="submit" class="btn btn-primary">{{ cg.button | default: "View my photos" | escape }}</button>
+        </div>
+        <p class="gallery-open-error" role="alert" hidden></p>
+      </form>
+    </section>
+
 
   <div class="lightbox" id="lightbox" hidden>
     <button class="lightbox-close" aria-label="Close">&times;</button>

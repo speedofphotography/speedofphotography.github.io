@@ -46,6 +46,25 @@ const SAMPLES = {
 
 const npx = (args, opts = {}) => spawnSync("npx", ["--yes", WRANGLER, ...args], { cwd: work, shell: true, encoding: "utf8", ...opts });
 
+// The live home page with this branch's "client gallery" box added at the bottom, and this branch's
+// style.css and script.js. Everything else (photos, fonts) still loads from the live site.
+function homePage(live) {
+  if (!live.includes("</main>")) return "";
+  const src = fs.readFileSync(path.join(repo, "index.html"), "utf8");
+  const section = (src.match(/\n\s*\{%-? assign cg[\s\S]*?id="client-gallery"[\s\S]*?<\/section>\n/) || [""])[0];
+  const data = {};
+  for (const m of fs.readFileSync(path.join(repo, "_data", "client_gallery.yml"), "utf8").matchAll(/^(\w+):\s*(.*)$/gm)) {
+    data[m[1]] = m[2].replace(/^(["'])(.*)\1$/, "$2");
+  }
+  const esc = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+  const html = section.replace(/\{%-?[^%]*-?%\}/g, "")
+    .replace(/\{\{\s*cg\.(\w+)\s*\|\s*default:\s*"([^"]*)"[^}]*\}\}/g, (_, k, d) => esc(data[k] || d));
+  return live
+    .replace(/(src|href)="\/(?!\/)/g, `$1="${LIVE}/`)
+    .replace(new RegExp(`(href|src)="${LIVE}/(style\\.css|script\\.js)[^"]*"`, "g"), '$1="/$2"')
+    .replace("</main>", html + "  </main>");
+}
+
 async function buildSite() {
   fs.rmSync(site, { recursive: true, force: true });
   fs.mkdirSync(path.join(site, "g"), { recursive: true });
@@ -97,7 +116,7 @@ ${body}
 </html>
 `;
   fs.writeFileSync(path.join(site, "g", "index.html"), html);
-  fs.writeFileSync(path.join(site, "index.html"), '<!doctype html><meta http-equiv="refresh" content="0; url=/g/">');
+  fs.writeFileSync(path.join(site, "index.html"), homePage(home) || '<!doctype html><meta http-equiv="refresh" content="0; url=/g/">');
   fs.writeFileSync(path.join(work, "wrangler.toml"), [
     'name = "sop-delivery-preview"',
     'pages_build_output_dir = "./site"',
