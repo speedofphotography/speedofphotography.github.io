@@ -1,102 +1,28 @@
-// SOP Studio page. Everything goes through the local app (studio.mjs); this page never sees the R2 keys.
-const app = document.getElementById("app");
+// SOP Studio page: sign-in, galleries, settings and page routing. Client records live in crm.js.
+// Everything goes through the local app (studio.mjs); this page never sees the R2 keys.
+import { app, info, hooks, h, show, toast, api, Locked, enc, fileUrl, size, day, isoIn, plural, copy, field, busyForm, back, go } from "./ui.js";
+import * as crm from "./crm.js";
+
 const nav = document.querySelector(".bar-actions");
-const toastEl = document.getElementById("toast");
-let info = { setup: false, signedIn: false, site: "" };
 let uploading = 0;
 
-// ---------- helpers ----------
-
-// Builds elements without innerHTML, so names and messages always show as plain text.
-function h(tag, attrs = {}, ...kids) {
-  const el = document.createElement(tag);
-  for (const [k, v] of Object.entries(attrs || {})) {
-    if (v == null || v === false) continue;
-    if (k.startsWith("on")) el.addEventListener(k.slice(2), v);
-    else if (k === "class") el.className = v;
-    else if (v === true) el.setAttribute(k, "");
-    else el.setAttribute(k, v);
+// The gallery list, reused for a minute so moving between pages doesn't re-check R2 every time.
+let albumsCache = null;
+async function loadAlbums(force = false) {
+  if (force || !albumsCache || Date.now() - albumsCache.at > 60000) {
+    albumsCache = { at: Date.now(), list: (await api("GET", "/api/albums")).albums };
   }
-  for (const kid of kids.flat()) if (kid != null && kid !== false) el.append(kid instanceof Node ? kid : String(kid));
-  return el;
+  return albumsCache.list;
+}
+const dropAlbums = () => { albumsCache = null; };
+
+async function createGallery(body) {
+  const { code } = await api("POST", "/api/albums", body);
+  dropAlbums();
+  return code;
 }
 
-function show(...kids) {
-  app.replaceChildren(...kids);
-  window.scrollTo(0, 0);
-}
-
-let toastTimer;
-function toast(msg, bad = false) {
-  toastEl.textContent = msg;
-  toastEl.className = "on" + (bad ? " bad" : "");
-  clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => (toastEl.className = ""), 4000);
-}
-
-async function api(method, path, body) {
-  const res = await fetch(path, {
-    method,
-    headers: { "x-studio": "1", ...(body ? { "content-type": "application/json" } : {}) },
-    body: body ? JSON.stringify(body) : undefined,
-    credentials: "same-origin",
-  });
-  const data = await res.json().catch(() => ({}));
-  if (res.status === 401 && !["/api/login", "/api/setup", "/api/passphrase"].includes(path)) {
-    info.signedIn = false;
-    start();
-    throw new Error("Locked");
-  }
-  if (!res.ok) throw new Error(data.error || "Something went wrong.");
-  return data;
-}
-
-const enc = encodeURIComponent;
-const fileUrl = (code, name, thumb) => `/api/albums/${enc(code)}/files/${enc(name)}${thumb ? "?thumb=1" : ""}`;
-
-function size(bytes) {
-  if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
-  if (bytes < 1024 ** 3) return `${(bytes / 1024 ** 2).toFixed(bytes < 10 * 1024 ** 2 ? 1 : 0)} MB`;
-  return `${(bytes / 1024 ** 3).toFixed(1)} GB`;
-}
-function day(iso) {
-  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || "");
-  if (!m) return "";
-  return new Date(+m[1], m[2] - 1, +m[3]).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
-}
-function isoIn(days) {
-  const d = new Date();
-  d.setDate(d.getDate() + days);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
-const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
-
-async function copy(textValue) {
-  try { await navigator.clipboard.writeText(textValue); toast("Link copied."); }
-  catch { prompt("Copy the link:", textValue); }
-}
-
-function field(label, input, hint) {
-  return h("label", { class: "field" }, h("span", {}, label), input, hint ? h("small", {}, hint) : null);
-}
-
-// Runs a form's async action with the button busy and errors shown under the form.
-function busyForm(form, action) {
-  const err = h("p", { class: "form-error", role: "alert", hidden: true });
-  form.append(err);
-  form.addEventListener("submit", async (e) => {
-    e.preventDefault();
-    const btn = form.querySelector("button[type=submit]");
-    btn.disabled = true;
-    err.hidden = true;
-    try { await action(new FormData(form)); }
-    catch (ex) { if (ex.message !== "Locked") { err.textContent = ex.message; err.hidden = false; } }
-    finally { btn.disabled = false; }
-  });
-  return form;
-}
-
-// ---------- screens ----------
+// ---------- sign-in ----------
 
 function setupScreen() {
   const form = h("form", { class: "panel narrow", autocomplete: "off" },
@@ -111,20 +37,21 @@ function setupScreen() {
     field("Secret Access Key", h("input", { name: "secretAccessKey", type: "password", required: true })),
     field("Bucket", h("input", { name: "bucket", value: "sop-deliveries", required: true, spellcheck: "false" })),
     field("New passphrase", h("input", { name: "passphrase", type: "password", required: true, minlength: "12", autocomplete: "new-password" }),
-      "At least 12 characters. A few random words works well. If you forget it, you'll set up again with a new token."),
+      "At least 12 characters. A few random words works well. Setting up on a new computer later? Use the same passphrase and your client records come back."),
     field("Passphrase again", h("input", { name: "confirm", type: "password", required: true, autocomplete: "new-password" })),
     h("button", { type: "submit", class: "btn btn-primary" }, "Connect"));
   show(busyForm(form, async (d) => {
     if (d.get("passphrase") !== d.get("confirm")) throw new Error("The two passphrases don't match.");
-    await api("POST", "/api/setup", Object.fromEntries(d));
+    const { restored } = await api("POST", "/api/setup", Object.fromEntries(d));
+    if (restored) toast("Connected. Your client records were restored.");
     info.signedIn = true;
-    location.hash = "#/";
+    go("#/");
     start();
   }));
 }
 
 function loginScreen() {
-  const input = h("input", { name: "passphrase", type: "password", required: true, autocomplete: "current-password", autofocus: true });
+  const input = h("input", { name: "passphrase", type: "password", required: true, autocomplete: "current-password" });
   const form = h("form", { class: "panel narrow" },
     h("h1", {}, "Unlock"),
     field("Passphrase", input),
@@ -138,29 +65,36 @@ function loginScreen() {
   input.focus();
 }
 
+// ---------- galleries ----------
+
 async function albumsScreen() {
   const list = h("div", { class: "albums" }, h("p", { class: "muted" }, "Loading galleries…"));
-  show(h("div", { class: "head" }, h("h1", {}, "Galleries"), h("a", { href: "#/new", class: "btn btn-primary" }, "New gallery")), list);
-  const { albums } = await api("GET", "/api/albums");
+  show(h("div", { class: "head" }, h("h1", {}, "Galleries"), h("a", { href: "#/galleries/new", class: "btn btn-primary" }, "New gallery")), list);
+  const [albums] = await Promise.all([loadAlbums(true), crm.load()]);
   if (!albums.length) {
-    list.replaceChildren(h("p", { class: "muted" }, "No galleries yet. Make one with New gallery."));
+    list.replaceChildren(h("p", { class: "muted" }, "No galleries yet. Make one from a shoot, or with New gallery."));
     return;
   }
-  list.replaceChildren(...albums.map((a) => h("article", { class: "album" + (a.expired ? " is-expired" : "") },
-    h("a", { href: `#/g/${a.code}`, class: "album-cover" },
-      a.cover ? h("img", { src: fileUrl(a.code, a.cover, true), alt: "", loading: "lazy" }) : h("span", {}, a.count ? "No preview" : "Empty")),
-    h("div", { class: "album-body" },
-      h("h2", {}, h("a", { href: `#/g/${a.code}` }, a.title || a.client || a.code)),
-      h("p", { class: "muted" }, [a.client && a.title ? a.client : "", day(a.date)].filter(Boolean).join(" · ")),
-      h("p", {}, `${plural(a.count, "file")}${a.count ? ` · ${size(a.size)}` : ""}`),
-      h("p", { class: a.expired ? "warn" : "muted" }, a.expired ? `Expired ${day(a.expires)}` : a.expires ? `Open until ${day(a.expires)}` : "No end date")),
-    h("button", { type: "button", class: "btn btn-line small", onclick: () => copy(a.link) }, "Copy link"))));
+  list.replaceChildren(...albums.map((a) => {
+    const shoot = crm.shootForGallery(a.code);
+    const who = shoot && crm.clientById(shoot.clientId);
+    return h("article", { class: "album" + (a.expired ? " is-expired" : "") },
+      h("a", { href: `#/g/${a.code}`, class: "album-cover" },
+        a.cover ? h("img", { src: fileUrl(a.code, a.cover, true), alt: "", loading: "lazy" }) : h("span", {}, a.count ? "No preview" : "Empty")),
+      h("div", { class: "album-body" },
+        h("h2", {}, h("a", { href: `#/g/${a.code}` }, a.title || a.client || a.code)),
+        h("p", { class: "muted" }, who ? h("a", { href: `#/shoots/${shoot.id}` }, who.name) : a.client && a.title ? a.client : "",
+          a.date ? `${who || (a.client && a.title) ? " · " : ""}${day(a.date)}` : ""),
+        h("p", {}, `${plural(a.count, "file")}${a.count ? ` · ${size(a.size)}` : ""}`),
+        h("p", { class: a.expired ? "warn" : "muted" }, a.expired ? `Expired ${day(a.expires)}` : a.expires ? `Open until ${day(a.expires)}` : "No end date")),
+      h("button", { type: "button", class: "btn btn-line small", onclick: () => copy(a.link) }, "Copy link"));
+  }));
 }
 
-function newScreen() {
+function newGalleryScreen() {
   const form = h("form", { class: "panel narrow", autocomplete: "off" },
-    h("p", {}, h("a", { href: "#/", class: "back" }, "← Galleries")),
     h("h1", {}, "New gallery"),
+    h("p", { class: "muted" }, "Tip: making it from a shoot (Shoots > the shoot > Create gallery) fills this in and keeps it linked to the client."),
     field("Client name", h("input", { name: "client", required: true, maxlength: "120" })),
     field("Car", h("input", { name: "car", maxlength: "120" }), "Optional. Goes into the link and the default title."),
     field("Title", h("input", { name: "title", maxlength: "120" }), "Leave blank for \"Client's Car\"."),
@@ -169,18 +103,18 @@ function newScreen() {
     field("Note to the client", h("textarea", { name: "message", rows: "3", maxlength: "2000" },
       "Thanks for a great shoot! Let me know if you'd like any extra edits.")),
     h("button", { type: "submit", class: "btn btn-primary" }, "Create gallery"));
-  show(busyForm(form, async (d) => {
+  show(back("#/galleries", "Galleries"), busyForm(form, async (d) => {
     const body = Object.fromEntries(d);
     if (!body.title) body.title = body.car ? `${body.client}'s ${body.car}` : `${body.client}'s photos`;
-    const { code } = await api("POST", "/api/albums", body);
-    location.hash = `#/g/${code}`;
+    go(`#/g/${await createGallery(body)}`);
   }));
 }
 
 async function albumScreen(code) {
   show(h("p", { class: "muted" }, "Loading…"));
-  const a = await api("GET", `/api/albums/${enc(code)}`);
-  const names = new Set(a.files.map((f) => f.name));
+  const [a] = await Promise.all([api("GET", `/api/albums/${enc(code)}`), crm.load()]);
+  const shoot = crm.shootForGallery(code);
+  const client = shoot && crm.clientById(shoot.clientId);
   const selected = new Set();
 
   const grid = h("div", { class: "grid" });
@@ -221,15 +155,15 @@ async function albumScreen(code) {
     const list = [...selected];
     if (!confirm(`Delete ${plural(list.length, "file")} from this gallery? This can't be undone.`)) return;
     delBtn.disabled = true;
-    let done = 0;
+    const done = [];
     for (const name of list) {
-      try { await api("DELETE", `/api/albums/${enc(code)}/files/${enc(name)}`); done++; }
-      catch (e) { toast(e.message, true); break; }
+      try { await api("DELETE", `/api/albums/${enc(code)}/files/${enc(name)}`); done.push(name); }
+      catch (e) { if (!(e instanceof Locked)) toast(e.message, true); break; }
     }
-    a.files = a.files.filter((f) => !list.slice(0, done).includes(f.name));
-    list.slice(0, done).forEach((n) => names.delete(n));
+    a.files = a.files.filter((f) => !done.includes(f.name));
+    dropAlbums();
     render();
-    if (done) toast(`Deleted ${plural(done, "file")}.`);
+    if (done.length) toast(`Deleted ${plural(done.length, "file")}.`);
   }
 
   // ----- uploads -----
@@ -254,7 +188,7 @@ async function albumScreen(code) {
   }
   function pump() {
     summaryLine.textContent = active || pending.length
-      ? `Uploading ${finished + failed + 1 > total ? total : finished + failed + 1} of ${total}… keep this page open.`
+      ? `Uploading ${Math.min(finished + failed + 1, total)} of ${total}… keep this page open.`
       : `Uploaded ${plural(finished, "file")}${failed ? `, ${failed} failed` : ""}.`;
     while (active < 2 && pending.length) {
       const job = pending.shift();
@@ -268,6 +202,7 @@ async function albumScreen(code) {
     }
     if (!active && !pending.length && total) {
       total = finished = failed = 0;
+      dropAlbums();
       refresh();
     }
   }
@@ -281,7 +216,7 @@ async function albumScreen(code) {
       x.onload = () => {
         let msg = "";
         try { msg = JSON.parse(x.responseText).error || ""; } catch { /* not JSON */ }
-        if (x.status === 401) { info.signedIn = false; start(); reject(new Error("Locked")); }
+        if (x.status === 401) { info.signedIn = false; hooks.locked(); reject(new Locked("Locked")); }
         else if (x.status >= 200 && x.status < 300) resolve();
         else reject(new Error(msg || `Upload failed (${x.status}).`));
       };
@@ -298,14 +233,13 @@ async function albumScreen(code) {
   }
   async function refresh() {
     try {
-      const fresh = await api("GET", `/api/albums/${enc(code)}`);
-      a.files = fresh.files;
-      a.files.forEach((f) => names.add(f.name));
+      a.files = (await api("GET", `/api/albums/${enc(code)}`)).files;
       render();
-    } catch (e) { if (e.message !== "Locked") toast(e.message, true); }
+    } catch (e) { if (!(e instanceof Locked)) toast(e.message, true); }
   }
 
   // ----- details -----
+  const heading = h("h1", {}, a.title || a.client || code);
   const details = busyForm(h("form", { class: "panel details", autocomplete: "off" },
     h("h2", {}, "Details"),
     field("Title", h("input", { name: "title", value: a.title || "", maxlength: "120" })),
@@ -325,17 +259,20 @@ async function albumScreen(code) {
     const body = Object.fromEntries(d);
     await api("PUT", `/api/albums/${enc(code)}/meta`, body);
     Object.assign(a, body);
+    dropAlbums();
     heading.textContent = a.title || a.client || code;
     toast("Details saved.");
   });
 
-  const heading = h("h1", {}, a.title || a.client || code);
   show(
-    h("p", {}, h("a", { href: "#/", class: "back" }, "← Galleries")),
+    back("#/galleries", "Galleries"),
     h("div", { class: "head" }, heading, a.expired ? h("span", { class: "badge" }, "Expired") : null),
+    shoot ? h("p", { class: "muted" }, "For ", h("a", { href: `#/shoots/${shoot.id}` }, `${client?.name || "client"}${shoot.car ? `'s ${shoot.car}` : ""}`),
+      ` · ${shoot.status === "delivered" ? "delivered" : "not marked delivered yet"}`) : null,
     h("div", { class: "link-row" },
       h("code", {}, a.link),
       h("button", { type: "button", class: "btn btn-primary small", onclick: () => copy(a.link) }, "Copy link"),
+      client?.email ? h("a", { class: "btn btn-line small", href: crm.emailHref(client, shoot, a.link, a.expires) }, "Email link") : null,
       h("a", { href: a.link, target: "_blank", rel: "noopener", class: "btn btn-line small" }, "Open")),
     drop, fileInput, progress,
     h("div", { class: "head files-head" }, h("h2", {}, "Files"), countLine, delBtn),
@@ -345,14 +282,15 @@ async function albumScreen(code) {
       h("h2", {}, "Delete gallery"),
       h("p", { class: "muted" }, "Removes every file and the link stops working. This can't be undone."),
       h("button", { type: "button", class: "btn btn-line", onclick: async (e) => {
-        const typed = prompt(`To delete "${a.title || code}" and all its files, type DELETE.`);
-        if (typed !== "DELETE") return;
+        if (prompt(`To delete "${a.title || code}" and all its files, type DELETE.`) !== "DELETE") return;
         e.target.disabled = true;
         try {
           const { deleted } = await api("DELETE", `/api/albums/${enc(code)}`);
+          dropAlbums();
+          await crm.unlinkGallery(code);
           toast(`Gallery deleted (${plural(deleted, "file")}).`);
-          location.hash = "#/";
-        } catch (ex) { e.target.disabled = false; if (ex.message !== "Locked") toast(ex.message, true); }
+          go("#/galleries");
+        } catch (ex) { e.target.disabled = false; if (!(ex instanceof Locked)) toast(ex.message, true); }
       } }, "Delete this gallery")));
   render();
 }
@@ -372,7 +310,11 @@ async function makeThumb(file) {
   } catch { return null; }
 }
 
-function settingsScreen() {
+// ---------- settings ----------
+
+async function settingsScreen() {
+  await crm.load();
+  const b = crm.backupState();
   const pass = busyForm(h("form", { class: "panel narrow", autocomplete: "off" },
     h("h2", {}, "Change passphrase"),
     field("Current passphrase", h("input", { name: "current", type: "password", required: true, autocomplete: "current-password" })),
@@ -399,15 +341,26 @@ function settingsScreen() {
     keys.reset();
     toast("New keys saved.");
   });
-  show(h("p", {}, h("a", { href: "#/", class: "back" }, "← Galleries")), h("h1", {}, "Settings"), pass, keys);
+  const records = h("section", { class: "panel narrow" }, h("h2", {}, "Client records"),
+    h("p", { class: "muted" }, "Kept encrypted on this computer, with a daily copy for the last 30 days, and an encrypted backup in your R2 bucket. Only your passphrase unlocks them."),
+    h("p", {}, b.error ? h("span", { class: "warn" }, `Last R2 backup failed: ${b.error}. It retries on the next change.`)
+      : b.at && b.at !== "earlier" ? `Backed up to R2 ${new Date(b.at).toLocaleString()}.` : b.at ? "Backed up to R2." : "Not backed up to R2 yet."));
+  show(back("#/", "Today"), h("h1", {}, "Settings"), records, pass, keys);
 }
 
 // ---------- routing ----------
 
+function markNav(hash) {
+  const section = hash.startsWith("/clients") ? "clients" : hash.startsWith("/shoots") ? "shoots"
+    : hash.startsWith("/g") ? "galleries" : hash.startsWith("/settings") ? "settings" : "today";
+  for (const a of nav.querySelectorAll("a[data-nav]")) a.toggleAttribute("aria-current", a.dataset.nav === section);
+}
+
 async function start() {
-  try { info = await (await fetch("/api/state", { headers: { "x-studio": "1" } })).json(); }
-  catch { show(h("p", { class: "panel narrow" }, "The app isn't running. Start it again with Studio.cmd.")); return; }
+  try { Object.assign(info, await (await fetch("/api/state", { headers: { "x-studio": "1" } })).json()); }
+  catch { show(h("p", { class: "panel narrow" }, "The app isn't running. Start it again from the SOP Studio icon.")); return; }
   nav.hidden = !info.signedIn;
+  if (!info.signedIn) { crm.forget(); dropAlbums(); }
   if (!info.setup) return setupScreen();
   if (!info.signedIn) return loginScreen();
   route();
@@ -415,24 +368,38 @@ async function start() {
 
 async function route() {
   if (!info.signedIn) return;
-  const hash = location.hash.slice(1) || "/";
+  const [path, qs] = (location.hash.slice(1) || "/").split("?");
+  const q = new URLSearchParams(qs || "");
+  markNav(path);
+  const deps = { createGallery, loadAlbums };
+  let m;
   try {
-    const g = /^\/g\/([^/]+)$/.exec(hash);
-    if (g) await albumScreen(decodeURIComponent(g[1]));
-    else if (hash === "/new") newScreen();
-    else if (hash === "/settings") settingsScreen();
-    else await albumsScreen();
+    if (path === "/") await crm.todayScreen(loadAlbums);
+    else if (path === "/clients") await crm.clientsScreen();
+    else if (path === "/clients/new") await crm.clientForm(null, q.get("then"));
+    else if ((m = /^\/clients\/([\w-]+)\/edit$/.exec(path))) await crm.clientForm(m[1]);
+    else if ((m = /^\/clients\/([\w-]+)$/.exec(path))) await crm.clientScreen(m[1]);
+    else if (path === "/shoots") await crm.shootsScreen(q.get("status") || "active");
+    else if (path === "/shoots/new") await crm.shootForm(null, q.get("client"));
+    else if ((m = /^\/shoots\/([\w-]+)\/edit$/.exec(path))) await crm.shootForm(m[1]);
+    else if ((m = /^\/shoots\/([\w-]+)$/.exec(path))) await crm.shootScreen(m[1], deps);
+    else if (path === "/galleries") await albumsScreen();
+    else if (path === "/galleries/new") newGalleryScreen();
+    else if ((m = /^\/g\/([^/]+)$/.exec(path))) await albumScreen(decodeURIComponent(m[1]));
+    else if (path === "/settings") await settingsScreen();
+    else go("#/");
   } catch (e) {
-    if (e.message !== "Locked") show(h("p", { class: "panel narrow form-error" }, e.message), h("p", {}, h("a", { href: "#/", class: "back" }, "← Galleries")));
+    if (!(e instanceof Locked)) show(h("p", { class: "panel narrow form-error" }, e.message), back("#/", "Today"));
   }
 }
 
+hooks.locked = start;
 window.addEventListener("hashchange", route);
 window.addEventListener("beforeunload", (e) => { if (uploading) e.preventDefault(); });
 document.querySelector("[data-lock]").addEventListener("click", async () => {
   await fetch("/api/logout", { method: "POST", headers: { "x-studio": "1" } }).catch(() => {});
   info.signedIn = false;
-  location.hash = "#/";
+  go("#/");
   start();
 });
 start();

@@ -15,23 +15,22 @@ export const exists = () => fs.existsSync(FILE);
 const derive = (pass, salt, { N, r, p }) => new Promise((resolve, reject) =>
   crypto.scrypt(pass.normalize("NFC"), salt, 32, { N, r, p, maxmem: 256 * N * r + 1024 * 1024 }, (e, k) => (e ? reject(e) : resolve(k))));
 
-export async function save(pass, secrets) {
+// Locks any small object with a passphrase. Returns the locked form as JSON text.
+export async function seal(pass, obj) {
   const salt = crypto.randomBytes(16);
   const iv = crypto.randomBytes(12);
   const key = await derive(pass, salt, KDF);
   const cipher = crypto.createCipheriv("aes-256-gcm", key, iv);
-  const data = Buffer.concat([cipher.update(JSON.stringify(secrets), "utf8"), cipher.final()]);
-  const out = { v: 1, kdf: { name: "scrypt", ...KDF }, salt: salt.toString("base64"), iv: iv.toString("base64"),
-    tag: cipher.getAuthTag().toString("base64"), data: data.toString("base64") };
-  fs.mkdirSync(DIR, { recursive: true });
-  const tmp = FILE + ".tmp";
-  fs.writeFileSync(tmp, JSON.stringify(out, null, 2), { mode: 0o600 });
-  fs.renameSync(tmp, FILE);
+  const data = Buffer.concat([cipher.update(JSON.stringify(obj), "utf8"), cipher.final()]);
+  return JSON.stringify({ v: 1, kdf: { name: "scrypt", ...KDF }, salt: salt.toString("base64"), iv: iv.toString("base64"),
+    tag: cipher.getAuthTag().toString("base64"), data: data.toString("base64") }, null, 2);
 }
 
-// The saved keys, or null if the passphrase is wrong.
-export async function open(pass) {
-  const v = JSON.parse(fs.readFileSync(FILE, "utf8"));
+// The object, or null if the passphrase is wrong (or the text isn't something seal() made).
+export async function unseal(pass, textValue) {
+  let v;
+  try { v = JSON.parse(textValue); } catch { return null; }
+  if (!v || !v.kdf || !v.salt) return null;
   const key = await derive(pass, Buffer.from(v.salt, "base64"), v.kdf);
   try {
     const d = crypto.createDecipheriv("aes-256-gcm", key, Buffer.from(v.iv, "base64"));
@@ -41,3 +40,14 @@ export async function open(pass) {
     return null;
   }
 }
+
+export async function save(pass, secrets) {
+  const out = await seal(pass, secrets);
+  fs.mkdirSync(DIR, { recursive: true });
+  const tmp = FILE + ".tmp";
+  fs.writeFileSync(tmp, out, { mode: 0o600 });
+  fs.renameSync(tmp, FILE);
+}
+
+// The saved keys, or null if the passphrase is wrong.
+export const open = async (pass) => unseal(pass, fs.readFileSync(FILE, "utf8"));

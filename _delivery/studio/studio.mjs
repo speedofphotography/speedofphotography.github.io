@@ -15,6 +15,7 @@ import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import * as vault from "./vault.mjs";
 import { createR2, R2Error } from "./r2.mjs";
+import * as crm from "./crm.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repo = path.resolve(here, "..", "..");
@@ -30,19 +31,31 @@ const MAX_THUMB = 2 * 1024 * 1024;
 const THUMBS = ".thumbs"; // small previews for this app only; the client page never lists sub-folders
 const ARGS = new Set(process.argv.slice(2));
 
-const state = { r2: null, bucket: "", session: "", seen: 0, fails: 0, lockUntil: 0, checking: false };
+const state = { r2: null, crm: null, bucket: "", session: "", seen: 0, fails: 0, lockUntil: 0, checking: false };
 
 function lock() {
-  state.r2?.close();
+  const { r2, crm: store } = state;
   state.r2 = null;
+  state.crm = null;
   state.session = "";
+  // Finish any client-records backup that's waiting, then let go of the connection.
+  if (r2) (store ? store.flush() : Promise.resolve()).catch(() => {}).finally(() => r2.close());
 }
 setInterval(() => { if (state.session && Date.now() - state.seen > IDLE_MS) lock(); }, 30000).unref();
 
 function connect(secrets) {
   lock();
   state.r2 = createR2({ ...secrets, endpoint: process.env.SOP_STUDIO_ENDPOINT });
+  state.crm = crm.createStore(state.r2, Buffer.from(secrets.dataKey, "base64"));
   state.bucket = secrets.bucket;
+}
+
+const newDataKey = () => crypto.randomBytes(32).toString("base64");
+
+// Keeps R2's passphrase-locked copy of the client-records key current (see crm.mjs). Runs in the background.
+function shareKey(r2, pass, dataKey) {
+  vault.seal(pass, { dataKey }).then((sealed) => r2.put(crm.REMOTE_KEY, sealed, "application/json"))
+    .catch((e) => console.error("Couldn't back up the records key:", e.message));
 }
 
 // ---------- HTTP basics ----------
@@ -80,8 +93,9 @@ function readBody(req, limit) {
     req.on("error", reject);
   });
 }
-async function readJson(req) {
-  try { return JSON.parse((await readBody(req, 64 * 1024)).toString("utf8")) || {}; }
+async function readJson(req, limit = 64 * 1024) {
+  const body = await readBody(req, limit);
+  try { return JSON.parse(body.toString("utf8")) || {}; }
   catch { throw Object.assign(new Error("Bad request"), { status: 400 }); }
 }
 
@@ -89,6 +103,8 @@ const STATIC = {
   "/": ["app.html", "text/html; charset=utf-8"],
   "/app.css": ["app.css", "text/css; charset=utf-8"],
   "/app.js": ["app.js", "text/javascript; charset=utf-8"],
+  "/ui.js": ["ui.js", "text/javascript; charset=utf-8"],
+  "/crm.js": ["crm.js", "text/javascript; charset=utf-8"],
   "/logo.png": [installed ? path.join(here, "logo.png") : path.join(repo, "images", "logo-small.png"), "image/png"],
 };
 
@@ -204,18 +220,35 @@ const api = {
       return fail(res, 400, "Paste both the Access Key ID and the Secret Access Key from the token page.");
     }
     if (!/^[a-z0-9][a-z0-9-]{1,61}[a-z0-9]$/.test(secrets.bucket)) return fail(res, 400, "That isn't a valid bucket name.");
+    let old = null;
     if (replacing) {
-      if (!(await vault.open(pass))) return fail(res, 401, "That passphrase isn't right.");
+      old = await vault.open(pass);
+      if (!old) return fail(res, 401, "That passphrase isn't right.");
     } else if (pass.length < 12) return fail(res, 400, "Use a passphrase of at least 12 characters.");
 
     const test = createR2({ ...secrets, endpoint: process.env.SOP_STUDIO_ENDPOINT });
-    try { await test.list({ max: 1 }); }
-    catch (e) { return fail(res, 400, storageMessage(e, secrets.bucket)); }
+    let restored = false;
+    try {
+      await test.list({ max: 1 });
+      if (old) secrets.dataKey = old.dataKey || newDataKey();
+      else {
+        // Client records already in R2 from an earlier setup? Same passphrase unlocks them again.
+        const sealed = await test.getText(crm.REMOTE_KEY);
+        const found = sealed ? await vault.unseal(pass, sealed) : null;
+        if (found?.dataKey) { secrets.dataKey = found.dataKey; restored = true; }
+        else {
+          secrets.dataKey = newDataKey();
+          if (sealed) await setAside(test); // locked with a different passphrase: keep it, out of the way
+        }
+        moveLocalRecordsAside(restored);
+      }
+    } catch (e) { return fail(res, 400, storageMessage(e, secrets.bucket)); }
     finally { test.close(); }
 
     await vault.save(pass, secrets);
     connect(secrets);
-    startSession(res, { ok: true });
+    shareKey(state.r2, pass, secrets.dataKey);
+    startSession(res, { ok: true, restored });
   },
 
   async login(req, res) {
@@ -235,7 +268,13 @@ const api = {
       await new Promise((r) => setTimeout(r, 1000));
       return fail(res, 401, "That passphrase isn't right.");
     }
+    if (!secrets.dataKey) {
+      secrets.dataKey = newDataKey();
+      await vault.save(passphrase, secrets);
+    }
     connect(secrets);
+    const r2 = state.r2;
+    r2.getText(crm.REMOTE_KEY).then((t) => { if (!t) shareKey(r2, passphrase, secrets.dataKey); }).catch(() => {});
     startSession(res, { ok: true });
   },
 
@@ -250,7 +289,20 @@ const api = {
     const secrets = typeof current === "string" ? await vault.open(current) : null;
     if (!secrets) return fail(res, 401, "The current passphrase isn't right.");
     await vault.save(next, secrets);
+    shareKey(state.r2, next, secrets.dataKey);
     send(res, 200, { ok: true });
+  },
+
+  async getCrm(req, res) {
+    const doc = await state.crm.load();
+    send(res, 200, { doc, backup: state.crm.backup });
+  },
+
+  async saveCrm(req, res) {
+    const { doc } = await readJson(req, 20 * 1024 * 1024);
+    const saved = await state.crm.save(doc || {});
+    if (!saved) return send(res, 409, { error: "These records were changed in another window. Showing the latest now.", doc: await state.crm.load() });
+    send(res, 200, { rev: saved.rev, backup: state.crm.backup });
   },
 
   async listAlbums(req, res) {
@@ -327,6 +379,23 @@ const api = {
   },
 };
 
+// Copies R2's old client-records backup (locked with a passphrase nobody has any more) to _studio/old-<time>/.
+async function setAside(r2) {
+  const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+  for (const key of [crm.REMOTE, crm.REMOTE_KEY]) {
+    const buf = await r2.getBuffer(key);
+    if (buf) await r2.put(key.replace("_studio/", `_studio/old-${stamp}/`), buf, "application/octet-stream");
+  }
+}
+
+// A fresh setup can't read records locked by an earlier key: keep that file in backups\ rather than overwrite it.
+function moveLocalRecordsAside(restored) {
+  const file = path.join(vault.DIR, "crm.enc");
+  if (restored || !fs.existsSync(file)) return;
+  fs.mkdirSync(path.join(vault.DIR, "backups"), { recursive: true });
+  fs.renameSync(file, path.join(vault.DIR, "backups", `crm-old-${Date.now()}.enc`));
+}
+
 function storageMessage(e, bucket) {
   if (e.code === "NoSuchBucket") return `There's no bucket named "${bucket}" on that account.`;
   if (e.status === 401 || e.status === 403 || e.code === "InvalidAccessKeyId" || e.code === "SignatureDoesNotMatch") {
@@ -346,6 +415,8 @@ async function route(req, res, url) {
 
   if (!signedIn(req)) return fail(res, 401, "Signed out.");
   if (pathname === "/api/passphrase" && m === "POST") return api.passphrase(req, res);
+  if (pathname === "/api/crm" && m === "GET") return api.getCrm(req, res);
+  if (pathname === "/api/crm" && m === "PUT") return api.saveCrm(req, res);
   if (pathname === "/api/albums" && m === "GET") return api.listAlbums(req, res);
   if (pathname === "/api/albums" && m === "POST") return api.createAlbum(req, res);
 

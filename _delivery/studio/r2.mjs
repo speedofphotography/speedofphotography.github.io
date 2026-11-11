@@ -106,9 +106,13 @@ export function createR2({ accountId, accessKeyId, secretAccessKey, bucket, endp
       } while (token);
       return out;
     },
-    async getText(key) {
-      try { return (await collect(await send("GET", key))).toString("utf8"); }
+    async getBuffer(key) {
+      try { return await collect(await send("GET", key)); }
       catch (e) { if (e.status === 404) return null; throw e; }
+    },
+    async getText(key) {
+      const buf = await this.getBuffer(key);
+      return buf ? buf.toString("utf8") : null;
     },
     get: (key, headers) => send("GET", key, { headers }),
     async put(key, body, type) {

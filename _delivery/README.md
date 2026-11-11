@@ -55,6 +55,20 @@ Open it from the icon, or double-click **`Studio.cmd`** in this folder. It opens
 There you can make a gallery (the client link is created for you), drag photos in, change the title, note and
 end date, delete photos, close a gallery early, or delete it. Keep the black window open while you work.
 
+**Client records (CRM).** Studio also keeps your clients and shoots:
+
+- **Today**: follow-ups due this week, past shoots still marked booked, what's coming up, what's waiting to
+  be edited, delivered shoots not yet paid, and galleries closing in the next two weeks.
+- **Clients**: contact details, cars, how they found you, notes, their shoots, follow-ups and a history of
+  calls, emails and messages. Search, and export to CSV.
+- **Shoots**: one per booking, moving Inquiry > Booked > Shot > Editing > Delivered (or Cancelled), with date,
+  location, package, payment and a private amount. "Create gallery for this shoot" makes the gallery with the
+  title and dates filled in and links it; "Email link" opens a ready-made email to the client.
+
+The records are encrypted on this PC (`%APPDATA%\SOP Studio\crm.enc`, plus a daily copy for 30 days in
+`backups\`), and an encrypted copy is kept in the bucket (`_studio/`, which the gallery pages can never serve).
+Set Studio up on another computer with the same passphrase and the records come back.
+
 **Why it's safe.** Studio runs only on your computer. The website has no admin page at all, so there is
 nothing online for anyone else to log in to. Studio connects to R2 with an API token that you keep on this PC,
 locked with your passphrase:

@@ -13,8 +13,8 @@ if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
 }
 
 New-Item -ItemType Directory -Force -Path (Join-Path $dest "lib") | Out-Null
-foreach ($f in "studio.mjs", "r2.mjs", "vault.mjs", "app.html", "app.js", "app.css") {
-  Copy-Item (Join-Path $here "studio\$f") (Join-Path $dest $f) -Force
+Get-ChildItem (Join-Path $here "studio") -File -Include *.mjs, *.js, *.html, *.css -Recurse | ForEach-Object {
+  Copy-Item $_.FullName (Join-Path $dest $_.Name) -Force
 }
 Copy-Item (Join-Path $repo "_functions_lib\delivery.js") (Join-Path $dest "lib\delivery.js") -Force
 Copy-Item (Join-Path $repo "images\logo-small.png") (Join-Path $dest "logo.png") -Force
