@@ -128,8 +128,10 @@ textarea { resize: vertical; }
 .client-row { grid-template-columns: 1fr auto 170px; }
 .client-row > .muted { font-size: 0.85rem; }
 .row-with-action { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center; }
-.pill { font: 600 0.72rem var(--body); text-transform: uppercase; letter-spacing: 0.06em; padding: 3px 8px; border-radius: 20px;
+.pill { font: 600 0.72rem var(--body); text-transform: uppercase; letter-spacing: 0.06em; display: inline-block; line-height: 1; padding: 5px 9px 4px; border-radius: 20px;
   border: 1px solid var(--line); color: var(--muted); white-space: nowrap; }
+/* Trim the box to the capital letters so the label sits exactly in the middle. */
+@supports (text-box: trim-both cap alphabetic) { .pill { text-box: trim-both cap alphabetic; padding: 6px 9px; } }
 .s-inquiry { color: #e3c25a; border-color: rgba(227, 194, 90, 0.4); }
 .s-booked { color: #7fb0ff; border-color: rgba(127, 176, 255, 0.45); }
 .s-shot, .s-editing { color: #c99bff; border-color: rgba(201, 155, 255, 0.4); }
