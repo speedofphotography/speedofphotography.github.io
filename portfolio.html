@@ -18,7 +18,7 @@ permalink: /portfolio/
 
     {%- comment %}
       Rolling and Interiors lead as sideways-scrolling preview rows. Below them, the full portfolio shows every photo
-      (rolling and interior shots too), with photos of the same car kept together by script.js.
+      (rolling and interior shots too) in the order they were added. In the two rows, photos of the same car are kept together by script.js.
       Row titles live in _data/portfolio_tabs.yml. A photo's row comes from its category (rolling / interior).
     {% endcomment %}
     {%- assign tabs = site.data.portfolio_tabs %}
@@ -70,7 +70,7 @@ permalink: /portfolio/
         <button class="filter" data-filter="events" role="tab" aria-selected="false">{{ c.filters.events | default: "Events" | escape }}</button>
         {%- endif %}
       </div>
-      <div class="gallery masonry" data-group-by-car>
+      <div class="gallery masonry">
         {%- for p in all_photos %}
         {%- comment %} Photos by other photographers (images/credited/) must never appear in the gallery or portfolio. {% endcomment %}
         {%- if p.image contains "/credited/" %}{% continue %}{% endif %}
