@@ -16,7 +16,8 @@ export const REMOTE = "_studio/crm.enc";
 export const REMOTE_KEY = "_studio/key.json";
 const MAGIC = Buffer.from("SOPCRM1");
 
-export const empty = () => ({ v: 1, rev: 0, clients: [], shoots: [], notes: [], tasks: [] });
+// settings.galleryDays: how long new galleries stay open (0 = no end date).
+export const empty = () => ({ v: 1, rev: 0, settings: { galleryDays: 60 }, clients: [], shoots: [], notes: [], tasks: [] });
 
 export function encrypt(key, doc) {
   const iv = crypto.randomBytes(12);
@@ -60,6 +61,8 @@ const SCHEMA = {
 export function clean(doc) {
   const out = empty();
   out.rev = Number.isInteger(doc?.rev) ? doc.rev : 0;
+  const days = doc?.settings?.galleryDays;
+  if (Number.isInteger(days) && days >= 0 && days <= 3650) out.settings.galleryDays = days;
   for (const [list, fields] of Object.entries(SCHEMA)) {
     const seen = new Set();
     for (const item of Array.isArray(doc?.[list]) ? doc[list].slice(0, 20000) : []) {

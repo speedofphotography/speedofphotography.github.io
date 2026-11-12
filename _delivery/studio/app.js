@@ -91,7 +91,23 @@ async function albumsScreen() {
   }));
 }
 
-function newGalleryScreen() {
+// "Open for": a set length, no end date, or a chosen day. Returns the field and a function giving the end date.
+function lengthField(days) {
+  const sel = h("select", { "aria-label": "Open for" },
+    crm.LENGTHS.map(([d, label]) => h("option", { value: String(d) }, label)), h("option", { value: "date" }, "Until a date I pick…"));
+  sel.value = String(days);
+  if (sel.value !== String(days)) sel.value = "60";
+  const date = h("input", { type: "date", value: crm.endFor(days || 60), min: isoIn(0), "aria-label": "Open until", hidden: true });
+  sel.addEventListener("change", () => { date.hidden = sel.value !== "date"; });
+  return {
+    el: field("Open for", [sel, date], "After the last day the link says the gallery has expired."),
+    end: () => (sel.value === "date" ? date.value : crm.endFor(Number(sel.value))),
+  };
+}
+
+async function newGalleryScreen() {
+  await crm.load();
+  const length = lengthField(crm.galleryDays());
   const form = h("form", { class: "panel narrow", autocomplete: "off" },
     h("h1", {}, "New gallery"),
     h("p", { class: "muted" }, "Tip: making it from a shoot (Shoots > the shoot > Create gallery) fills this in and keeps it linked to the client."),
@@ -99,12 +115,13 @@ function newGalleryScreen() {
     field("Car", h("input", { name: "car", maxlength: "120" }), "Goes into the link, the default title and each download's file name."),
     field("Title", h("input", { name: "title", maxlength: "120" }), "Leave blank for \"Client's Car\"."),
     field("Shoot date", h("input", { name: "date", type: "date", value: isoIn(0) })),
-    field("Open until", h("input", { name: "expires", type: "date", value: isoIn(60) }), "After this day the link says the gallery has expired."),
+    length.el,
     field("Note to the client", h("textarea", { name: "message", rows: "3", maxlength: "2000" },
       "Thanks for a great shoot! Let me know if you'd like any extra edits.")),
     h("button", { type: "submit", class: "btn btn-primary" }, "Create gallery"));
   show(back("#/galleries", "Galleries"), busyForm(form, async (d) => {
     const body = Object.fromEntries(d);
+    body.expires = length.end();
     if (!body.title) body.title = body.client && body.car ? `${body.client}'s ${body.car}` : body.client ? `${body.client}'s photos` : body.car || "Your photos";
     go(`#/g/${await createGallery(body)}`);
   }));
@@ -253,6 +270,16 @@ async function albumScreen(code) {
     h("div", { class: "pair" },
       field("Shoot date", h("input", { name: "date", type: "date", value: a.date || "" })),
       field("Open until", h("input", { name: "expires", type: "date", value: a.expires || "" }), "Blank means no end date.")),
+    h("div", { class: "row extend" }, h("span", { class: "muted" }, "Change how long it lasts:"),
+      [[30, "+30 days"], [90, "+90 days"], [365, "+1 year"]].map(([n, label]) => h("button", { type: "button", class: "btn btn-line small", onclick: () => {
+        // Counted from the current end date, or from today if it has already passed.
+        const cur = details.elements.expires.value;
+        const from = cur && cur >= isoIn(0) ? new Date(`${cur}T12:00`) : new Date();
+        from.setDate(from.getDate() + n);
+        details.elements.expires.value = `${from.getFullYear()}-${String(from.getMonth() + 1).padStart(2, "0")}-${String(from.getDate()).padStart(2, "0")}`;
+        details.requestSubmit();
+      } }, label)),
+      h("button", { type: "button", class: "btn btn-line small", onclick: () => { details.elements.expires.value = ""; details.requestSubmit(); } }, "No end date")),
     field("Note to the client", h("textarea", { name: "message", rows: "3", maxlength: "2000" }, a.message || "")),
     h("div", { class: "row" },
       h("button", { type: "submit", class: "btn btn-primary" }, "Save details"),
@@ -265,14 +292,25 @@ async function albumScreen(code) {
     const body = Object.fromEntries(d);
     await api("PUT", `/api/albums/${enc(code)}/meta`, body);
     Object.assign(a, body);
+    a.expired = !!a.expires && a.expires < isoIn(0);
     dropAlbums();
     heading.textContent = a.title || a.client || code;
-    toast("Details saved.");
+    showUntil();
+    toast(a.expires ? `Saved. Open until ${day(a.expires)}.` : "Saved. No end date.");
   });
+
+  const until = h("p", {});
+  function showUntil() {
+    until.className = a.expired ? "warn" : "muted";
+    until.textContent = a.expired ? `Expired ${day(a.expires)}. Clients see "this gallery has expired".`
+      : a.expires ? `Open until ${day(a.expires)}.` : "Open with no end date.";
+  }
+  showUntil();
 
   show(
     back("#/galleries", "Galleries"),
-    h("div", { class: "head" }, heading, a.expired ? h("span", { class: "badge" }, "Expired") : null),
+    h("div", { class: "head" }, heading),
+    until,
     shoot ? h("p", { class: "muted" }, "For ", h("a", { href: `#/shoots/${shoot.id}` }, `${client?.name || "client"}${shoot.car ? `'s ${shoot.car}` : ""}`),
       ` · ${shoot.status === "delivered" ? "delivered" : "not marked delivered yet"}`) : null,
     h("div", { class: "link-row" },
@@ -351,7 +389,14 @@ async function settingsScreen() {
     h("p", { class: "muted" }, "Kept encrypted on this computer, with a daily copy for the last 30 days, and an encrypted backup in your R2 bucket. Only your passphrase unlocks them."),
     h("p", {}, b.error ? h("span", { class: "warn" }, `Last R2 backup failed: ${b.error}. It retries on the next change.`)
       : b.at && b.at !== "earlier" ? `Backed up to R2 ${new Date(b.at).toLocaleString()}.` : b.at ? "Backed up to R2." : "Not backed up to R2 yet."));
-  show(back("#/", "Today"), h("h1", {}, "Settings"), records, pass, keys);
+  const lengthSel = h("select", { "aria-label": "Default gallery length", onchange: async () => {
+    try { await crm.setGalleryDays(Number(lengthSel.value)); toast("Saved. New galleries use this from now on."); }
+    catch (e) { if (!(e instanceof Locked)) toast(e.message, true); }
+  } }, crm.LENGTHS.map(([d, label]) => h("option", { value: String(d) }, label)));
+  lengthSel.value = String(crm.galleryDays());
+  const galleries = h("section", { class: "panel narrow" }, h("h2", {}, "Galleries"),
+    field("New galleries stay open for", lengthSel, "You can still pick a different length for each gallery, and extend or shorten it later on its page."));
+  show(back("#/", "Today"), h("h1", {}, "Settings"), galleries, records, pass, keys);
 }
 
 // ---------- routing ----------
@@ -409,7 +454,7 @@ async function route() {
     else if ((m = /^\/shoots\/([\w-]+)\/edit$/.exec(path))) await crm.shootForm(m[1]);
     else if ((m = /^\/shoots\/([\w-]+)$/.exec(path))) await crm.shootScreen(m[1], deps);
     else if (path === "/galleries") await albumsScreen();
-    else if (path === "/galleries/new") newGalleryScreen();
+    else if (path === "/galleries/new") await newGalleryScreen();
     else if ((m = /^\/g\/([^/]+)$/.exec(path))) await albumScreen(decodeURIComponent(m[1]));
     else if (path === "/settings") await settingsScreen();
     else go("#/");

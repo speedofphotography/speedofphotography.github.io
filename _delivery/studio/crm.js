@@ -53,6 +53,17 @@ const byDateDesc = (a, b) => (b.date || "").localeCompare(a.date || "");
 const shootsOf = (clientId) => doc.shoots.filter((s) => s.clientId === clientId).sort(byDateDesc);
 export const carsOf = (c) => (c?.cars || "").split(/\n|,/).map((s) => s.trim()).filter(Boolean);
 export const shootForGallery = (code) => doc?.shoots.find((s) => s.gallery === code);
+// ---------- gallery length ----------
+// How long a gallery stays open. The default for new galleries is set in Settings.
+export const LENGTHS = [[14, "2 weeks"], [30, "30 days"], [60, "60 days"], [90, "90 days"], [180, "6 months"], [365, "1 year"], [0, "No end date"]];
+export const galleryDays = () => doc?.settings?.galleryDays ?? 60;
+export const endFor = (days) => (days ? isoIn(days) : "");
+export async function setGalleryDays(days) {
+  await load();
+  doc.settings = { ...(doc.settings || {}), galleryDays: days };
+  await save();
+}
+
 // ---------- website bookings ----------
 // Requests from the booking form wait (encrypted) in the bucket. This adds each one to the records: the client
 // (matched by email, phone or Instagram, or added new), an Inquiry shoot, a note, and a follow-up to reply today.
@@ -508,7 +519,7 @@ function galleryPanel(s, c, { createGallery, loadAlbums, refresh }) {
     make.disabled = true;
     try {
       const code = await createGallery({
-        client: c?.name || "", car: s.car, date: s.date || today(), expires: isoIn(60),
+        client: c?.name || "", car: s.car, date: s.date || today(), expires: endFor(galleryDays()),
         title: s.title || (c && s.car ? `${c.name}'s ${s.car}` : c ? `${c.name}'s photos` : "Your photos"),
         message: "Thanks for a great shoot! Let me know if you'd like any extra edits.",
       });

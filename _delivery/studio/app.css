@@ -47,6 +47,8 @@ p { margin: 0 0 8px; }
 .back { color: var(--muted); text-decoration: none; }
 .back:hover { color: var(--text); }
 .row { display: flex; flex-wrap: wrap; gap: 12px; }
+.row.extend { align-items: center; gap: 8px; margin: -4px 0 20px; }
+.field select + input { margin-top: 8px; }
 .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 0 16px; }
 
 .field { display: block; margin-bottom: 16px; }
