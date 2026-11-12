@@ -41,9 +41,6 @@ Pictures\SOP Deliveries\                  R2 bucket "sop-deliveries"  (not set u
 | `date` | `"2026-11-10"` | "November 10, 2026" under the heading. |
 | `message` | `"Thanks for a great shoot!"` | A short note above the photos. Line breaks are kept. |
 | `expires` | `"2027-02-01"` | "Available to download until…". After that day the link says the gallery has expired. |
-| `car` | `"Porsche 911 GT3 RS"` | Not shown; used in download names. |
-
-Clients' downloads are named client first name, car, then the photo's number in that gallery, starting at 1 (e.g. `Maya_Porsche-911-GT3-RS_07.jpg`); videos are numbered too, other files keep their own name.
 
 Hidden files (like `.DS_Store`), `gallery.json` itself and anything in sub-folders are never shown.
 

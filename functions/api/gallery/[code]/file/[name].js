@@ -1,6 +1,6 @@
 // GET /api/gallery/<code>/file/<name> : one original file, straight from R2.
 // Add ?dl=1 to make the browser save it instead of showing it. Supports Range (resumable downloads).
-import { CODE_RE, typeOf, noindex, readMeta, isExpired, isClientFile, safeDownloadName } from "../../../../../_functions_lib/delivery.js";
+import { CODE_RE, typeOf, noindex, readMeta, isExpired, isClientFile } from "../../../../../_functions_lib/delivery.js";
 
 export async function onRequest({ request, params, env }) {
   if (request.method !== "GET" && request.method !== "HEAD") {
@@ -38,8 +38,6 @@ export async function onRequest({ request, params, env }) {
   headers.set("accept-ranges", "bytes");
   headers.set("cache-control", "private, max-age=3600");
   if (url.searchParams.has("dl")) {
-    // ?dl=<name> saves it under the gallery's download name (see downloadNames); ?dl=1 keeps the file's own name.
-    name = safeDownloadName(url.searchParams.get("dl"), name);
     const ascii = name.replace(/[^\x20-\x7e]|["\\]/g, "_");
     headers.set("content-disposition", `attachment; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(name)}`);
   }

@@ -69,32 +69,10 @@ export async function readMeta(bucket, code) {
     found: true,
     title: text(raw.title, 120),
     client: text(raw.client, 120),
-    car: text(raw.car, 120),
     date: text(raw.date, 40),
     message: text(raw.message, 2000),
     expires: text(raw.expires, 40),
   };
-}
-
-// The names clients' downloads are saved under: client first name, car, then the photo's number in this
-// gallery (starting at 1), e.g. "Maya_Porsche-911-GT3-RS_07.jpg". Numbers are padded so they sort in order.
-// Photos and videos are numbered; other files (a PDF, a note) keep their own name.
-const namePart = (s) => (s || "").normalize("NFKD").replace(/[\u0300-\u036f]/g, "").replace(/['\u2019]/g, "")
-  .replace(/[^A-Za-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 60);
-
-export function downloadNames(meta, files) {
-  const first = namePart((meta.client || "").trim().split(/\s+/)[0]);
-  const base = [first, namePart(meta.car)].filter(Boolean).join("_") || namePart(meta.title) || "Speed-Of-Photography";
-  const count = files.filter((f) => f.kind !== "file").length;
-  const width = String(count).length;
-  let n = 0;
-  return files.map((f) => (f.kind === "file" ? f.name : `${base}_${String(++n).padStart(width, "0")}.${extOf(f.name)}`));
-}
-
-// A download name the page asked for: plain letters, numbers, - _ . only, and the same type as the real file.
-export function safeDownloadName(asked, realName) {
-  if (typeof asked !== "string" || !/^[A-Za-z0-9][A-Za-z0-9._-]{0,199}$/.test(asked)) return realName;
-  return extOf(asked) === extOf(realName) ? asked : realName;
 }
 
 // A gallery stays open through the whole expiry day.

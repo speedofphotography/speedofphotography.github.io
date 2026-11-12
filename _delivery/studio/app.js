@@ -112,7 +112,7 @@ async function newGalleryScreen() {
     h("h1", {}, "New gallery"),
     h("p", { class: "muted" }, "Tip: making it from a shoot (Shoots > the shoot > Create gallery) fills this in and keeps it linked to the client."),
     field("Client name", h("input", { name: "client", maxlength: "120" })),
-    field("Car", h("input", { name: "car", maxlength: "120" }), "Goes into the link, the default title and each download's file name."),
+    field("Car", h("input", { name: "car", maxlength: "120" }), "Goes into the link and the default title."),
     field("Title", h("input", { name: "title", maxlength: "120" }), "Leave blank for \"Client's Car\"."),
     field("Shoot date", h("input", { name: "date", type: "date", value: isoIn(0) })),
     length.el,
@@ -132,11 +132,6 @@ async function albumScreen(code) {
   const [a] = await Promise.all([api("GET", `/api/albums/${enc(code)}`), crm.load()]);
   const shoot = crm.shootForGallery(code);
   const client = shoot && crm.clientById(shoot.clientId);
-  // Galleries made before downloads were named by car: take the car from the linked shoot.
-  if (!a.car && shoot?.car) {
-    const { code: _c, link: _l, expired: _e, files: _f, ...meta } = a;
-    api("PUT", `/api/albums/${enc(code)}/meta`, { ...meta, car: shoot.car }).then(() => { a.car = shoot.car; }).catch(() => {});
-  }
   const selected = new Set();
 
   const grid = h("div", { class: "grid" });
@@ -265,8 +260,7 @@ async function albumScreen(code) {
   const details = busyForm(h("form", { class: "panel details", autocomplete: "off" },
     h("h2", {}, "Details"),
     field("Title", h("input", { name: "title", value: a.title || "", maxlength: "120" })),
-    field("Client name", h("input", { name: "client", value: a.client || "", maxlength: "120" }), "Their first name starts each download's file name."),
-    field("Car", h("input", { name: "car", value: a.car || shoot?.car || "", maxlength: "120" }), "Goes in each download's file name, e.g. Maya_Porsche-911-GT3-RS_07.jpg."),
+    field("Client name", h("input", { name: "client", value: a.client || "", maxlength: "120" })),
     h("div", { class: "pair" },
       field("Shoot date", h("input", { name: "date", type: "date", value: a.date || "" })),
       field("Open until", h("input", { name: "expires", type: "date", value: a.expires || "" }), "Blank means no end date.")),
