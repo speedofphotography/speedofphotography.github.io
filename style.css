@@ -408,32 +408,18 @@ h1, h2, h3 {
 .gallery.masonry .shot { grid-column: auto; grid-row-end: span 130; margin-bottom: 12px; }
 .gallery.masonry .shot.tall { grid-row-end: span 270; }
 
-/* ---------- Portfolio tabs: Rolling / Interiors / Everything else ---------- */
-.pf-intro { text-align: center; margin: 0 auto; }
-.pf-tabs {
-  display: flex;
-  justify-content: center;
-  width: max-content;
-  max-width: 100%;
-  margin: 24px auto 36px;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  overflow: hidden;
-}
-.pf-tab {
-  padding: 14px 28px;
-  background: none;
-  border: 0;
-  color: var(--muted);
-  font: 700 1.05rem var(--display);
-  letter-spacing: 0.14em;
+/* ---------- Portfolio: Rolling and Interiors rows, then the full portfolio ---------- */
+.pf-intro { text-align: center; margin: 0 auto 8px; }
+.pf-row, .pf-all { margin-top: 48px; }
+.pf-all { margin-top: 72px; }
+.pf-title {
+  font: 700 clamp(1.8rem, 3.6vw, 2.6rem) var(--display);
+  letter-spacing: 0.04em;
   text-transform: uppercase;
-  cursor: pointer;
-  transition: background 0.2s, color 0.2s;
+  line-height: 1;
+  margin: 0 0 18px;
 }
-.pf-tab:hover { color: var(--text); }
-.pf-tab[aria-selected="true"] { background: var(--accent); color: #fff; }
-.pf-pane[hidden] { display: none; }
+.pf-all .filters { justify-content: flex-start; }
 .reel {
   display: flex;
   gap: 12px;
@@ -451,14 +437,15 @@ h1, h2, h3 {
 .reel:focus-visible { outline: 1px solid var(--accent); outline-offset: 4px; }
 .reel .reel-shot {
   flex: 0 0 auto;
-  height: min(68vh, 640px);
+  height: min(56vh, 520px);
   max-width: 100%;
   aspect-ratio: var(--r, 3 / 2);
   scroll-snap-align: start;
 }
 .reel .reel-shot:hover { transform: none; }
 @media (max-width: 760px) {
-  .pf-tab { padding: 12px 14px; font-size: 0.9rem; letter-spacing: 0.1em; }
+  .pf-row { margin-top: 36px; }
+  .pf-all { margin-top: 52px; }
   /* Phones: every photo the same width and at its own proportions (nothing cropped) */
   .reel { align-items: center; }
   .reel .reel-shot { width: 84vw; height: auto; max-width: none; }

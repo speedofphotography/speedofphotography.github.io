@@ -627,22 +627,22 @@ content:
     label: Link text to email instead
     type: string
 - name: portfolio_tabs
-  label: Portfolio tabs
+  label: Portfolio sections
   type: file
   path: _data/portfolio_tabs.yml
   format: yaml
   fields:
   - name: intro
-    label: Line above the tabs
+    label: Line at the top, above the photos
     type: text
   - name: rolling_tab
-    label: Rolling tab name
+    label: Rolling row title (also its filter button)
     type: string
   - name: interior_tab
-    label: Interiors tab name
+    label: Interiors row title (also its filter button)
     type: string
   - name: other_tab
-    label: Everything else tab name
+    label: Full portfolio title (the grid of every photo, below the rows)
     type: string
 - name: client_gallery
   label: Client gallery box (bottom of home page)

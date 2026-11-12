@@ -27,6 +27,42 @@ function setMenu(open) {
 toggle.addEventListener("click", () => setMenu(toggle.getAttribute("aria-expanded") !== "true"));
 links.querySelectorAll("a").forEach((a) => a.addEventListener("click", () => setMenu(false)));
 
+// ---------- Portfolio: photos of the same car sit together ----------
+// The car is read from each photo's caption: "McLaren Solus GT badge" and "McLaren Solus GT cockpit" are both the
+// "McLaren Solus GT". Endings like interior, seat, badge or "at Utah Lake" are ignored, and a caption that is the
+// start of another ("Lotus Emira" / "Lotus Emira GT4") counts as the same car. Photos whose file names start with
+// the same three words (porsche-992-carrera-lake.jpg / porsche-992-carrera-rolling.jpg) are kept together too.
+// Each car's photos stay where its first photo was in the list.
+document.querySelectorAll("[data-group-by-car]").forEach((grid) => {
+  const MAKES = new Set("porsche ferrari lamborghini mclaren audi bmw mercedes benz aston martin lotus ford chevrolet chevy nissan toyota honda acura mazda mitsubishi subaru dodge jeep tesla bugatti pagani koenigsegg rolls royce bentley maserati alfa romeo jaguar lexus volkswagen vw cadillac lucid rivian hyundai kia genesis mini yamaha kawasaki ducati suzuki".split(" "));
+  const STOP = new Set("at on in with from near during by and for".split(" "));
+  const PARTS = new Set("interior interiors seat seats headrest headrests badge badges shot shots wheel wheels steering cockpit taillight taillights headlight headlights light lights brake brakes caliper calipers crest door doors mirror mirrors engine exhaust detail details dash dashboard logo emblem rolling roller front rear side closeup".split(" "));
+  const carOf = (caption) => {
+    const words = caption.toLowerCase().normalize("NFKD").replace(/[\u0300-\u036f]/g, "")
+      .replace(/\b([a-z]{1,3}) (\d{1,2})\b/g, "$1$2") // "RS 3" and "RS3" are the same car
+      .split(/[^a-z0-9-]+/).filter(Boolean);
+    const car = [];
+    for (const w of words) { if (STOP.has(w) || w.startsWith("@")) break; car.push(w); }
+    while (car.length && PARTS.has(car[car.length - 1])) car.pop();
+    // "Singer Porsche 911": a maker's name after a tuner's name is left out, so it matches "Singer 911".
+    return car.filter((w, i) => i === 0 || MAKES.has(car[0]) || !MAKES.has(w));
+  };
+  const items = [...grid.querySelectorAll(".shot")].map((el, i) => {
+    const file = (el.dataset.src || "").split("/").pop().replace(/\.[^.]+$/, "").toLowerCase().split(/[^a-z0-9]+/);
+    return { el, i, car: carOf(el.querySelector("figcaption")?.textContent || ""), file };
+  });
+  const parent = items.map((_, i) => i);
+  const find = (i) => (parent[i] === i ? i : (parent[i] = find(parent[i])));
+  const join = (a, b) => { const ra = find(a), rb = find(b); if (ra !== rb) parent[Math.max(ra, rb)] = Math.min(ra, rb); };
+  const startsWith = (long, short) => short.length >= 2 && short.length <= long.length && short.every((w, k) => w === long[k]);
+  for (const a of items) for (const b of items) {
+    if (b.i <= a.i) continue;
+    if (startsWith(a.car, b.car) || startsWith(b.car, a.car)) join(a.i, b.i);
+    else if (a.file.length >= 3 && b.file.length >= 3 && a.file.slice(0, 3).join("-") === b.file.slice(0, 3).join("-")) join(a.i, b.i);
+  }
+  items.sort((a, b) => find(a.i) - find(b.i) || a.i - b.i).forEach(({ el }) => grid.append(el));
+});
+
 // ---------- Gallery filters ----------
 const shots = [...document.querySelectorAll(".shot")];
 document.querySelectorAll(".filter").forEach((btn) => {
@@ -80,20 +116,6 @@ document.querySelectorAll(".gallery.masonry").forEach((grid) => {
   document.querySelectorAll(".filter").forEach((btn) => btn.addEventListener("click", layout));
 });
 
-// ---------- Portfolio tabs (Rolling / Interiors / Everything else) ----------
-const pfTabs = [...document.querySelectorAll(".pf-tab")];
-if (pfTabs.length) {
-  const select = (tab) => {
-    pfTabs.forEach((t) => {
-      const on = t === tab;
-      t.setAttribute("aria-selected", String(on));
-      document.getElementById(`pane-${t.dataset.pane}`).hidden = !on;
-    });
-    window.dispatchEvent(new Event("resize")); // lets the staggered grid and row arrows measure the newly shown tab
-  };
-  pfTabs.forEach((t) => t.addEventListener("click", () => select(t)));
-  select(pfTabs[0]);
-}
 // Rows show each photo at its own proportions
 document.querySelectorAll(".reel-shot[data-src]").forEach((shot) => {
   const img = new Image();
@@ -306,7 +328,7 @@ if ("IntersectionObserver" in window) {
         io.unobserve(entry.target);
       }
     });
-  }, { threshold: 0.12 });
+  }, { rootMargin: "0px 0px -12% 0px" }); // starts as soon as the top comes into view, however tall the element is
   revealTargets.forEach((el) => {
     el.classList.add("reveal");
     io.observe(el);
