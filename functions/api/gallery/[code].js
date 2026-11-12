@@ -1,5 +1,5 @@
 // GET /api/gallery/<code> : the gallery's details and file list, for /g/<code>/.
-import { CODE_RE, META_FILE, json, readMeta, isExpired, isClientFile, kindOf } from "../../../_functions_lib/delivery.js";
+import { CODE_RE, META_FILE, json, readMeta, isExpired, isClientFile, kindOf, downloadNames } from "../../../_functions_lib/delivery.js";
 
 export async function onRequestGet({ params, env }) {
   const code = String(params.code || "");
@@ -24,6 +24,7 @@ export async function onRequestGet({ params, env }) {
   if (isExpired(meta)) return json({ error: "expired" }, 410);
 
   files.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: "base" }));
+  downloadNames(meta, files).forEach((d, i) => { files[i].download = d; });
   const { found, ...details } = meta;
   return json({ code, ...details, files });
 }

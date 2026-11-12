@@ -194,6 +194,8 @@ function cleanMeta(body) {
   const date = text(body.date, 10), expires = text(body.expires, 10);
   if (title) meta.title = title;
   if (client) meta.client = client;
+  const car = text(body.car, 120);
+  if (car) meta.car = car;
   if (DATE_RE.test(date)) meta.date = date;
   if (message) meta.message = message;
   if (DATE_RE.test(expires)) meta.expires = expires;
@@ -378,7 +380,6 @@ const api = {
   async createAlbum(req, res) {
     const b = await readJson(req);
     const meta = cleanMeta(b);
-    if (!meta.client && !meta.title) return fail(res, 400, "Give it a client name or a title.");
     let code;
     for (let i = 0; i < 5 && !code; i++) {
       const c = makeCode(text(b.client, 120), text(b.car, 120));

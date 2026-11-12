@@ -309,7 +309,7 @@ export async function clientForm(id, then) {
   const v = c || {};
   const form = busyForm(h("form", { class: "panel narrow", autocomplete: "off" },
     h("h1", {}, c ? "Edit client" : "New client"),
-    field("Name", h("input", { name: "name", required: true, maxlength: "120", value: v.name || "" })),
+    field("Name", h("input", { name: "name", maxlength: "120", value: v.name || "" })),
     field("Email", h("input", { name: "email", type: "email", maxlength: "200", value: v.email || "" })),
     field("Phone", h("input", { name: "phone", type: "tel", maxlength: "60", value: v.phone || "" })),
     field("Instagram", h("input", { name: "instagram", maxlength: "80", value: v.instagram || "", placeholder: "@handle" })),
@@ -321,6 +321,7 @@ export async function clientForm(id, then) {
       h("a", { href: c ? `#/clients/${c.id}` : "#/clients", class: "btn btn-line" }, "Cancel"))),
   async (d) => {
     const data = Object.fromEntries([...d].map(([k, x]) => [k, String(x).trim()]));
+    if (!data.name) data.name = c?.name || "Unnamed client";
     data.instagram = data.instagram.replace(/^@/, "").replace(/^https?:\/\/(www\.)?instagram\.com\//, "").replace(/\/.*$/, "");
     const target = c || { id: newId(), created: now() };
     Object.assign(target, data);
@@ -405,13 +406,9 @@ export async function shootForm(id, presetClient) {
   await load();
   const s = id ? shootOf(id) : null;
   if (id && !s) return go("#/shoots");
-  if (!doc.clients.length) {
-    return show(back("#/shoots", "Shoots"), h("section", { class: "panel narrow" }, h("h1", {}, "New shoot"),
-      h("p", { class: "muted" }, "Add the client first."), h("a", { href: "#/clients/new?then=shoot", class: "btn btn-primary" }, "New client")));
-  }
   const v = s || { clientId: presetClient || "", status: "inquiry", payment: "unpaid" };
   const clients = [...doc.clients].sort((a, b) => a.name.localeCompare(b.name));
-  const clientSel = select("clientId", [["", "Choose a client…"], ...clients.map((c) => [c.id, c.name])], v.clientId, { required: true });
+  const clientSel = select("clientId", [["", "No client"], ...clients.map((c) => [c.id, c.name])], v.clientId);
   const carInput = h("input", { name: "car", maxlength: "120", value: v.car || "" });
   const carList = h("datalist", { id: "car-list" });
   carInput.setAttribute("list", "car-list");
@@ -439,13 +436,13 @@ export async function shootForm(id, presetClient) {
       h("a", { href: s ? `#/shoots/${s.id}` : "#/shoots", class: "btn btn-line" }, "Cancel"))),
   async (d) => {
     const data = Object.fromEntries([...d].map(([k, x]) => [k, String(x).trim()]));
-    if (!clientOf(data.clientId)) throw new Error("Choose a client.");
+    if (!clientOf(data.clientId)) data.clientId = "";
     const target = s || { id: newId(), created: now(), gallery: "" };
     Object.assign(target, data);
     if (!s) doc.shoots.push(target);
     // Remember a new car on the client too.
     const c = clientOf(data.clientId);
-    if (data.car && !carsOf(c).some((x) => x.toLowerCase() === data.car.toLowerCase())) c.cars = [...carsOf(c), data.car].join("\n");
+    if (c && data.car && !carsOf(c).some((x) => x.toLowerCase() === data.car.toLowerCase())) c.cars = [...carsOf(c), data.car].join("\n");
     await save();
     toast(s ? "Saved." : "Shoot added.");
     go(`#/shoots/${target.id}`);

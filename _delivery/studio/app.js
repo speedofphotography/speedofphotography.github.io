@@ -95,8 +95,8 @@ function newGalleryScreen() {
   const form = h("form", { class: "panel narrow", autocomplete: "off" },
     h("h1", {}, "New gallery"),
     h("p", { class: "muted" }, "Tip: making it from a shoot (Shoots > the shoot > Create gallery) fills this in and keeps it linked to the client."),
-    field("Client name", h("input", { name: "client", required: true, maxlength: "120" })),
-    field("Car", h("input", { name: "car", maxlength: "120" }), "Optional. Goes into the link and the default title."),
+    field("Client name", h("input", { name: "client", maxlength: "120" })),
+    field("Car", h("input", { name: "car", maxlength: "120" }), "Goes into the link, the default title and each download's file name."),
     field("Title", h("input", { name: "title", maxlength: "120" }), "Leave blank for \"Client's Car\"."),
     field("Shoot date", h("input", { name: "date", type: "date", value: isoIn(0) })),
     field("Open until", h("input", { name: "expires", type: "date", value: isoIn(60) }), "After this day the link says the gallery has expired."),
@@ -105,7 +105,7 @@ function newGalleryScreen() {
     h("button", { type: "submit", class: "btn btn-primary" }, "Create gallery"));
   show(back("#/galleries", "Galleries"), busyForm(form, async (d) => {
     const body = Object.fromEntries(d);
-    if (!body.title) body.title = body.car ? `${body.client}'s ${body.car}` : `${body.client}'s photos`;
+    if (!body.title) body.title = body.client && body.car ? `${body.client}'s ${body.car}` : body.client ? `${body.client}'s photos` : body.car || "Your photos";
     go(`#/g/${await createGallery(body)}`);
   }));
 }
@@ -115,6 +115,11 @@ async function albumScreen(code) {
   const [a] = await Promise.all([api("GET", `/api/albums/${enc(code)}`), crm.load()]);
   const shoot = crm.shootForGallery(code);
   const client = shoot && crm.clientById(shoot.clientId);
+  // Galleries made before downloads were named by car: take the car from the linked shoot.
+  if (!a.car && shoot?.car) {
+    const { code: _c, link: _l, expired: _e, files: _f, ...meta } = a;
+    api("PUT", `/api/albums/${enc(code)}/meta`, { ...meta, car: shoot.car }).then(() => { a.car = shoot.car; }).catch(() => {});
+  }
   const selected = new Set();
 
   const grid = h("div", { class: "grid" });
@@ -243,7 +248,8 @@ async function albumScreen(code) {
   const details = busyForm(h("form", { class: "panel details", autocomplete: "off" },
     h("h2", {}, "Details"),
     field("Title", h("input", { name: "title", value: a.title || "", maxlength: "120" })),
-    field("Client name", h("input", { name: "client", value: a.client || "", maxlength: "120" })),
+    field("Client name", h("input", { name: "client", value: a.client || "", maxlength: "120" }), "Their first name starts each download's file name."),
+    field("Car", h("input", { name: "car", value: a.car || shoot?.car || "", maxlength: "120" }), "Goes in each download's file name, e.g. Maya_Porsche-911-GT3-RS_07.jpg."),
     h("div", { class: "pair" },
       field("Shoot date", h("input", { name: "date", type: "date", value: a.date || "" })),
       field("Open until", h("input", { name: "expires", type: "date", value: a.expires || "" }), "Blank means no end date.")),

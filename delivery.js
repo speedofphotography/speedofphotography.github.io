@@ -14,7 +14,9 @@ const els = {
 
 const code = (location.pathname.match(/^\/g\/([^/]+)/) || [])[1] || "";
 const enc = encodeURIComponent;
-const fileUrl = (f, dl) => `/api/gallery/${enc(code)}/file/${enc(f.name)}${dl ? "?dl=1" : ""}`;
+// Each file's save name ("Maya_Porsche-911-GT3-RS_07.jpg") comes from the gallery list; older lists fall back to the file's own name.
+const saveName = (f) => f.download || f.name;
+const fileUrl = (f, dl) => `/api/gallery/${enc(code)}/file/${enc(f.name)}${dl ? `?dl=${enc(saveName(f))}` : ""}`;
 // Cloudflare resizes previews on the live site; the local preview (_delivery/preview) shows originals.
 const LOCAL = /^(localhost|127\.0\.0\.1)$/.test(location.hostname);
 const sized = (f, width) => LOCAL ? fileUrl(f)
@@ -136,7 +138,7 @@ function buildGrid() {
     const dl = document.createElement("a");
     dl.className = "delivery-tile-dl";
     dl.href = fileUrl(f, true);
-    dl.setAttribute("download", f.name);
+    dl.setAttribute("download", saveName(f));
     dl.setAttribute("aria-label", `Download ${f.name}`);
     dl.title = `Download (${fmtBytes(f.size)})`;
     dl.innerHTML = '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M12 3v12m0 0l-5-5m5 5l5-5M4 19h16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
@@ -219,7 +221,7 @@ function show(p) {
   const f = files[viewable[pos]];
   lbCount.textContent = `${pos + 1} / ${viewable.length}`;
   lbDl.href = fileUrl(f, true);
-  lbDl.setAttribute("download", f.name);
+  lbDl.setAttribute("download", saveName(f));
   lbDl.textContent = `Download (${fmtBytes(f.size)})`;
   resetSave(f);
   if (f.kind === "video") {
@@ -260,7 +262,7 @@ lbSave.addEventListener("click", async (e) => {
     const res = await fetch(fileUrl(f));
     const blob = await res.blob();
     if (lbSave.dataset.name !== f.name) return; // moved on to another photo meanwhile
-    saveFile = new File([blob], f.name, { type: blob.type || "image/jpeg" });
+    saveFile = new File([blob], saveName(f), { type: blob.type || "image/jpeg" });
     lbSave.textContent = "Tap to save";
   } catch (err) {
     lbSave.textContent = "Save to Photos";
@@ -312,7 +314,7 @@ els.zip.addEventListener("click", async () => {
       setTimeout(() => reject(new Error("timeout")), 5000);
       sw.postMessage({
         type: "zip", id,
-        files: files.map((f) => ({ name: f.name, size: f.size, url: fileUrl(f), mtime: Date.parse(f.uploaded) })),
+        files: files.map((f) => ({ name: saveName(f), size: f.size, url: fileUrl(f), mtime: Date.parse(f.uploaded) })),
       }, [ch.port2]);
     });
     const onMsg = (e) => {
