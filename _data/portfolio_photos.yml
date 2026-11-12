@@ -191,3 +191,23 @@ photos:
     caption: Audi RS 3 seat
     category: interior
     size: tall
+  - image: /images/lamborghini-huracan-sto-sidewalk.jpg
+    caption: Lamborghini Huracan STO
+    category: static
+    size: tall
+  - image: /images/lamborghini-huracan-sto-garage-doors.jpg
+    caption: Lamborghini Huracan STO
+    category: static
+    size: tall
+  - image: /images/lamborghini-huracan-sto-autumn.jpg
+    caption: Lamborghini Huracan STO
+    category: static
+    size: tall
+  - image: /images/lamborghini-huracan-sto-engine-bay.jpg
+    caption: Huracan STO Engine Bay
+    category: details
+    size: tall
+  - image: /images/lamborghini-huracan-sto-wheel.jpg
+    caption: Lamborghini Huracan STO
+    category: static
+    size: normal
