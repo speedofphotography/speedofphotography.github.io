@@ -11,6 +11,43 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% if pc.seo_title and pc.seo_title != "" %}{{ pc.seo_title | escape }} | {{ c.business_name | escape }}{% elsif page.title %}{{ page.title | escape }} | {{ c.business_name | escape }}{% else %}{{ c.seo_title | escape }}{% endif %}</title>
   <meta name="description" content="{% if pc.seo_description and pc.seo_description != "" %}{{ pc.seo_description | escape }}{% elsif page.description %}{{ page.description | escape }}{% else %}{{ c.seo_description | escape }}{% endif %}">
+  {%- unless page.noindex %}
+  {%- comment %} Search engines and link previews: the site's name (with its other spellings), the page's
+  one true address, and a preview card. {% endcomment %}
+  {%- assign site_url = "https://speedofphotography.com" -%}
+  {%- assign page_path = page.url | replace: "index.html", "" -%}
+  {%- capture page_title %}{% if pc.seo_title and pc.seo_title != "" %}{{ pc.seo_title }} | {{ c.business_name }}{% elsif page.title %}{{ page.title }} | {{ c.business_name }}{% else %}{{ c.seo_title }}{% endif %}{% endcapture -%}
+  {%- capture page_desc %}{% if pc.seo_description and pc.seo_description != "" %}{{ pc.seo_description }}{% elsif page.description %}{{ page.description }}{% else %}{{ c.seo_description }}{% endif %}{% endcapture %}
+  <link rel="canonical" href="{{ site_url }}{{ page_path }}">
+  <meta property="og:site_name" content="{{ c.business_name | escape }}">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="{{ page_title | strip | escape }}">
+  <meta property="og:description" content="{{ page_desc | strip | escape }}">
+  <meta property="og:url" content="{{ site_url }}{{ page_path }}">
+  <meta property="og:image" content="{{ site_url }}{{ c.hero.background | default: c.logo }}">
+  <meta name="twitter:card" content="summary_large_image">
+  {%- if page.url == "/" %}
+  <script type="application/ld+json">
+  [{
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    "name": {{ c.business_name | jsonify }},
+    "alternateName": ["Speed of Photography", "SpeedOfPhotography", "speedofphotography"],
+    "url": "{{ site_url }}/"
+  }, {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    "name": {{ c.business_name | jsonify }},
+    "alternateName": ["Speed of Photography", "SpeedOfPhotography"],
+    "description": {{ c.seo_description | jsonify }},
+    "url": "{{ site_url }}/",
+    "logo": "{{ site_url }}{{ c.logo }}",
+    "image": "{{ site_url }}{{ c.hero.background }}",
+    "sameAs": [{{ c.contact.instagram_url | jsonify }}]
+  }]
+  </script>
+  {%- endif %}
+  {%- endunless %}
   <link rel="icon" href="{{ base }}/favicon.ico" sizes="48x48">
   <link rel="icon" href="{{ base }}/favicon-32.png" type="image/png" sizes="32x32">
   <link rel="apple-touch-icon" href="{{ base }}/apple-touch-icon.png">

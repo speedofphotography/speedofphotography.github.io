@@ -1,0 +1,8 @@
+---
+layout: null
+permalink: /robots.txt
+---
+User-agent: *
+Disallow: /api/
+
+Sitemap: https://speedofphotography.com/sitemap.xml
