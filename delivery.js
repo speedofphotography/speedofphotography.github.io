@@ -1,7 +1,8 @@
 // ---------- Client photo delivery (the page at /g/<code>/) ----------
 // How galleries are organised, delivered and previewed: _delivery/README.md
 // Previews and the large view are resized by Cloudflare Image Transformations (5,000 new sizes a month free;
-// each photo uses 2). Downloads are always the untouched originals.
+// each photo uses 2). If resizing isn't available, the page falls back to the originals. Previews only load as
+// they come near the screen either way. Downloads are always the untouched originals.
 
 (() => {
 const root = document.getElementById("delivery");
@@ -17,8 +18,17 @@ const enc = encodeURIComponent;
 const fileUrl = (f, dl) => `/api/gallery/${enc(code)}/file/${enc(f.name)}${dl ? "?dl=1" : ""}`;
 // Cloudflare resizes previews on the live site; the local preview (_delivery/preview) shows originals.
 const LOCAL = /^(localhost|127\.0\.0\.1)$/.test(location.hostname);
-const sized = (f, width) => LOCAL ? fileUrl(f)
+let resize = !LOCAL; // switched off after the first failed resize, so every later preview asks for the original
+const sized = (f, width) => !resize ? fileUrl(f)
   : `/cdn-cgi/image/width=${width},quality=85,fit=scale-down,format=auto,onerror=redirect${fileUrl(f)}`;
+// Loads a preview into a tile as it comes near the screen.
+const nearScreen = "IntersectionObserver" in window
+  ? new IntersectionObserver((entries) => entries.forEach((e) => {
+      if (!e.isIntersecting) return;
+      nearScreen.unobserve(e.target);
+      e.target._load();
+    }), { rootMargin: "800px 0px" })
+  : { observe: (el) => el._load() };
 const THUMB = 900;
 const LARGE = 2400;
 
@@ -112,11 +122,22 @@ function buildGrid() {
     tile.setAttribute("role", "button");
     tile.setAttribute("aria-label", `${f.kind === "file" ? "Download" : "View"} ${f.name}`);
     if (f.kind === "image") {
-      const src = sized(f, THUMB);
-      tile.style.setProperty("--img", `url("${src}")`);
-      const img = new Image();
-      img.onload = () => { tile.dataset.ratio = img.naturalWidth / img.naturalHeight || 1.5; tile.classList.add("is-loaded"); queueLayout(); };
-      img.src = src;
+      tile._load = () => {
+        const img = new Image();
+        img.onload = () => {
+          tile.style.setProperty("--img", `url("${img.src}")`);
+          tile.dataset.ratio = img.naturalWidth / img.naturalHeight || 1.5;
+          tile.classList.add("is-loaded");
+          queueLayout();
+        };
+        img.onerror = () => {
+          if (!img.src.includes("/cdn-cgi/")) return;
+          resize = false; // Cloudflare resizing isn't on: use the original instead
+          img.src = sized(f, THUMB);
+        };
+        img.src = sized(f, THUMB);
+      };
+      nearScreen.observe(tile);
     } else if (f.kind === "video") {
       const v = document.createElement("video");
       v.muted = true;
