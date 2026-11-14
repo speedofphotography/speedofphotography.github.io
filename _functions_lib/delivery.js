@@ -26,7 +26,7 @@ export const kindOf = (name) => (IMAGES.has(extOf(name)) ? "image" : VIDEOS.has(
 // keeping galleries out of search engines and never sending the gallery address to other sites.
 export const SECURITY = {
   "strict-transport-security": "max-age=31536000; includeSubDomains",
-  "content-security-policy": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' https://formsubmit.co; worker-src 'self'; manifest-src 'self'; frame-src 'none'; object-src 'none'; base-uri 'self'; form-action 'self' https://formsubmit.co; frame-ancestors 'none'; upgrade-insecure-requests",
+  "content-security-policy": "default-src 'self'; script-src 'self' https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' https://formsubmit.co https://cloudflareinsights.com; worker-src 'self'; manifest-src 'self'; frame-src 'none'; object-src 'none'; base-uri 'self'; form-action 'self' https://formsubmit.co; frame-ancestors 'none'; upgrade-insecure-requests",
   "x-frame-options": "DENY",
   "x-content-type-options": "nosniff",
   "permissions-policy": "camera=(), microphone=(), geolocation=(), payment=(), usb=()",

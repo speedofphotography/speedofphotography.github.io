@@ -2,12 +2,12 @@
 # (The client gallery pages and /api/ answers come from Pages Functions, which this file doesn't reach;
 # they set the same headers in _functions_lib/delivery.js.)
 #
-# Content-Security-Policy: the page may only run this site's own scripts (no inline scripts, nothing from
+# Content-Security-Policy: the page may only run this site's own scripts and Cloudflare's visitor stats (no inline scripts, nothing else from
 # other sites), load fonts from Google Fonts, and send form data to this site and FormSubmit.
 # If you add something from another site (an embed, a script, a new form service), it must be added here too.
 /*
   Strict-Transport-Security: max-age=31536000; includeSubDomains
-  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' https://formsubmit.co; worker-src 'self'; manifest-src 'self'; frame-src 'none'; object-src 'none'; base-uri 'self'; form-action 'self' https://formsubmit.co; frame-ancestors 'none'; upgrade-insecure-requests
+  Content-Security-Policy: default-src 'self'; script-src 'self' https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' https://formsubmit.co https://cloudflareinsights.com; worker-src 'self'; manifest-src 'self'; frame-src 'none'; object-src 'none'; base-uri 'self'; form-action 'self' https://formsubmit.co; frame-ancestors 'none'; upgrade-insecure-requests
   X-Frame-Options: DENY
   X-Content-Type-Options: nosniff
   Referrer-Policy: strict-origin-when-cross-origin
