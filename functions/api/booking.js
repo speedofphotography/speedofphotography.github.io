@@ -8,24 +8,34 @@
 const PUBLIC_KEY = "_studio/inbox-public.json";
 const MAX_WAITING = 500; // stop accepting if Studio hasn't collected in a long time (or someone is flooding it)
 
+import { SECURITY } from "../../_functions_lib/delivery.js";
+
 const text = (v, max) => (typeof v === "string" ? v.trim().slice(0, max) : "");
 const reply = (status, body) => new Response(JSON.stringify(body), {
-  status, headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" },
+  status, headers: { ...SECURITY, "content-type": "application/json; charset=utf-8", "cache-control": "no-store" },
 });
 const b64 = (buf) => btoa(String.fromCharCode(...new Uint8Array(buf)));
 
 export async function onRequestPost({ request, env }) {
   const bucket = env.DELIVERY;
   if (!bucket) return reply(503, { error: "not_configured" });
+  // Only the booking form on this site may send here: browsers always add the Origin header to it.
+  // (Too many requests from one address are also blocked by a Cloudflare rate-limiting rule.)
   const origin = request.headers.get("origin") || "";
   const host = new URL(request.url).host;
-  if (origin && new URL(origin).host !== host) return reply(403, { error: "forbidden" });
+  let fromHere = false;
+  try { fromHere = new URL(origin).host === host; } catch { fromHere = false; }
+  if (!fromHere) return reply(403, { error: "forbidden" });
+  if (!(request.headers.get("content-type") || "").startsWith("application/json")) return reply(415, { error: "bad_request" });
+  if (Number(request.headers.get("content-length") || 0) > 20000) return reply(413, { error: "too_big" });
 
   const raw = await request.text();
   if (raw.length > 20000) return reply(413, { error: "too_big" });
   let b;
   try { b = JSON.parse(raw); } catch { return reply(400, { error: "bad_request" }); }
-  if (!b || typeof b !== "object" || b._honey) return reply(400, { error: "bad_request" });
+  if (!b || typeof b !== "object" || Array.isArray(b)) return reply(400, { error: "bad_request" });
+  // The hidden spam-trap box: people never see it, bots fill it in. Pretend it worked and store nothing.
+  if (b._honey) return reply(200, { ok: true });
 
   const booking = {
     name: text(b.name, 120),

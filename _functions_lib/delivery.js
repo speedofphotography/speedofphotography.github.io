@@ -22,7 +22,16 @@ export const extOf = (name) => ((name.match(/\.([^.\/]+)$/) || [])[1] || "").toL
 export const typeOf = (name) => TYPES[extOf(name)] || "application/octet-stream";
 export const kindOf = (name) => (IMAGES.has(extOf(name)) ? "image" : VIDEOS.has(extOf(name)) ? "video" : "file");
 
-const NOINDEX = { "x-robots-tag": "noindex, nofollow", "referrer-policy": "no-referrer" };
+// The same security headers as the site's _headers file (that file doesn't reach Functions answers), plus
+// keeping galleries out of search engines and never sending the gallery address to other sites.
+export const SECURITY = {
+  "strict-transport-security": "max-age=31536000; includeSubDomains",
+  "content-security-policy": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' https://formsubmit.co; worker-src 'self'; manifest-src 'self'; frame-src 'none'; object-src 'none'; base-uri 'self'; form-action 'self' https://formsubmit.co; frame-ancestors 'none'; upgrade-insecure-requests",
+  "x-frame-options": "DENY",
+  "x-content-type-options": "nosniff",
+  "permissions-policy": "camera=(), microphone=(), geolocation=(), payment=(), usb=()",
+};
+const NOINDEX = { ...SECURITY, "x-robots-tag": "noindex, nofollow", "referrer-policy": "no-referrer" };
 
 export function json(data, status = 200) {
   return new Response(JSON.stringify(data), {

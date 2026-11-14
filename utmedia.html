@@ -111,7 +111,7 @@ permalink: /utmedia/
         {%- if u.join_text and u.join_text != "" %}<p class="section-sub">{{ u.join_text | escape }}</p>{% endif %}
       </div>
       <form class="contact-form utm-form" id="utm-form"
-            data-email="{{ af.email | default: site.data.content.contact.email | escape }}"
+            data-email-r="{{ af.email | default: site.data.content.contact.email | split: '' | reverse | join: '' | escape }}" data-formsubmit="{{ site.data.forms.formsubmit_alias | escape }}"
             data-subject="{{ af.email_subject | default: "New UTMedia application" | escape }}"
             data-sending="{{ af.sending | default: "Sending..." | escape }}"
             data-success="{{ af.success | default: "Thanks for applying! We'll be in touch." | escape }}"

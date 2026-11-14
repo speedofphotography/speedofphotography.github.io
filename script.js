@@ -1,10 +1,14 @@
 // Shared by every page; sections that aren't on the current page are skipped.
 const form = document.getElementById("contact-form");
 // The address the contact form sends inquiries to (set in the content file, read from the form).
-const CONTACT_EMAIL = form ? form.dataset.email : "";
-// FormSubmit (formsubmit.co) emails each booking to CONTACT_EMAIL. No account needed:
-// the very first submission sends an "Activate" email to that inbox, which must be clicked once.
-const FORM_ENDPOINT = `https://formsubmit.co/ajax/${CONTACT_EMAIL}`;
+// The page carries it written backwards (data-email-r), so address-harvesting bots reading the page don't find it.
+const unflip = (s) => (s || "").split("").reverse().join("");
+const CONTACT_EMAIL = form ? unflip(form.dataset.emailR) : "";
+// FormSubmit (formsubmit.co) emails each form to that inbox. No account needed: the very first submission
+// sends an "Activate" email there, which must be clicked once. If data-formsubmit holds the random alias
+// FormSubmit gives after activation (_data/forms.yml), it's used instead, so the address isn't needed at all.
+const formsubmitUrl = (el) => `https://formsubmit.co/ajax/${el.dataset.formsubmit || unflip(el.dataset.emailR)}`;
+const FORM_ENDPOINT = form ? formsubmitUrl(form) : "";
 
 document.getElementById("year").textContent = new Date().getFullYear();
 
@@ -392,7 +396,7 @@ if (utmForm) {
     status.className = "form-status";
     status.textContent = "";
     try {
-      const res = await fetch(`https://formsubmit.co/ajax/${ds.email}`, {
+      const res = await fetch(formsubmitUrl(utmForm), {
         method: "POST",
         referrerPolicy: "origin", // one FormSubmit activation covers every page
         headers: { "Content-Type": "application/json", Accept: "application/json" },
@@ -408,7 +412,7 @@ if (utmForm) {
       status.className = "form-status is-error";
       status.textContent = ds.error + " ";
       const link = document.createElement("a");
-      link.href = `mailto:${ds.email}?subject=${encodeURIComponent(payload._subject)}&body=${encodeURIComponent(body)}`;
+      link.href = `mailto:${unflip(ds.emailR)}?subject=${encodeURIComponent(payload._subject)}&body=${encodeURIComponent(body)}`;
       link.textContent = ds.errorLink;
       status.append(link);
     } finally {
@@ -441,7 +445,7 @@ if (suggestForm) {
     status.className = "form-status";
     status.textContent = "";
     try {
-      const res = await fetch(`https://formsubmit.co/ajax/${ds.email}`, {
+      const res = await fetch(formsubmitUrl(suggestForm), {
         method: "POST",
         referrerPolicy: "origin", // one FormSubmit activation covers every page
         headers: { "Content-Type": "application/json", Accept: "application/json" },
@@ -459,7 +463,7 @@ Suggested by: ${payload.suggested_by}`;
       status.className = "form-status is-error";
       status.textContent = ds.error + " ";
       const link = document.createElement("a");
-      link.href = `mailto:${ds.email}?subject=${encodeURIComponent(payload._subject)}&body=${encodeURIComponent(body)}`;
+      link.href = `mailto:${unflip(ds.emailR)}?subject=${encodeURIComponent(payload._subject)}&body=${encodeURIComponent(body)}`;
       link.textContent = ds.errorLink;
       status.append(link);
     } finally {

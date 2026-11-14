@@ -1,0 +1,4 @@
+# FormSubmit alias: after the first form is activated, FormSubmit emails a random string that can be used in place
+# of the email address. Put it here and the site's forms send to it instead, so the address isn't needed in the
+# page at all. Leave empty to keep sending to the contact email.
+formsubmit_alias: ""

@@ -1,4 +1,6 @@
 baseurl: ""
+include:
+  - _headers
 exclude:
   - README.md
   - images/README.md

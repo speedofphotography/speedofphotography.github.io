@@ -145,7 +145,7 @@ permalink: /packages/
         {%- endif %}
         {%- if ml.suggest_heading and ml.suggest_heading != "" %}
         <article class="location location-suggest">
-          <form class="location-body suggest-form" id="suggest-form" data-email="{{ c.contact.email | escape }}" data-subject="{{ ml.email_subject | default: 'Location suggestion' | escape }}" data-sending="{{ ml.sending | default: 'Sending...' | escape }}" data-success="{{ ml.success | escape }}" data-error="{{ ml.error | escape }}" data-error-link="{{ ml.error_link | default: 'Email it instead' | escape }}">
+          <form class="location-body suggest-form" id="suggest-form" data-email-r="{{ c.contact.email | split: '' | reverse | join: '' | escape }}" data-formsubmit="{{ site.data.forms.formsubmit_alias | escape }}" data-subject="{{ ml.email_subject | default: 'Location suggestion' | escape }}" data-sending="{{ ml.sending | default: 'Sending...' | escape }}" data-success="{{ ml.success | escape }}" data-error="{{ ml.error | escape }}" data-error-link="{{ ml.error_link | default: 'Email it instead' | escape }}">
             {%- if ml.suggest_tag and ml.suggest_tag != "" %}<span class="vibe">{{ ml.suggest_tag | escape }}</span>{% endif %}
             <h3>{{ ml.suggest_heading | escape }}</h3>
             {%- if ml.suggest_text and ml.suggest_text != "" %}<p>{{ ml.suggest_text | escape }}</p>{% endif %}
@@ -203,7 +203,7 @@ permalink: /packages/
         {%- endfor %}
         <p class="contact-note">{{ c.contact.note | escape }}</p>
       </div>
-      <form class="contact-form" id="contact-form" data-email="{{ c.contact.email | escape }}" data-sending="{{ fm.sending | default: "Sending..." | escape }}" data-success="{{ fm.success | default: "Thanks! Your booking request was sent." | escape }}" data-error="{{ fm.error | default: "Sorry, that didn't go through." | escape }}" data-error-link="{{ fm.error_link | default: "Email me directly instead." | escape }}">
+      <form class="contact-form" id="contact-form" data-email-r="{{ c.contact.email | split: '' | reverse | join: '' | escape }}" data-formsubmit="{{ site.data.forms.formsubmit_alias | escape }}" data-sending="{{ fm.sending | default: "Sending..." | escape }}" data-success="{{ fm.success | default: "Thanks! Your booking request was sent." | escape }}" data-error="{{ fm.error | default: "Sorry, that didn't go through." | escape }}" data-error-link="{{ fm.error_link | default: "Email me directly instead." | escape }}">
         <div class="field">
           <label for="name">{{ fm.name_label | default: "Name" | escape }}</label>
           <input id="name" name="name" type="text" autocomplete="name" required>

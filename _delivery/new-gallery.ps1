@@ -20,11 +20,16 @@ function Get-Slug([string]$text) {
   return (($plain.ToLower() -replace '[^a-z0-9]+', '-').Trim('-'))
 }
 
-# 6 random letters/numbers from a secure generator: about 2 billion possibilities, so links can't be guessed.
+# 8 random letters/numbers from a secure generator (about 850 billion possibilities, the same as SOP Studio),
+# so links can't be guessed. Bytes that would favour some letters over others are skipped.
 $alphabet = "abcdefghjkmnpqrstuvwxyz23456789"
-$bytes = New-Object byte[] 6
-[Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($bytes)
-$suffix = -join ($bytes | ForEach-Object { $alphabet[$_ % $alphabet.Length] })
+$rng = [Security.Cryptography.RandomNumberGenerator]::Create()
+$byte = New-Object byte[] 1
+$suffix = ""
+while ($suffix.Length -lt 8) {
+  $rng.GetBytes($byte)
+  if ($byte[0] -lt 248) { $suffix += $alphabet[$byte[0] % $alphabet.Length] } # 248 = 8 x 31
+}
 
 $name = Get-Slug ("$Client $Car")
 if ($name.Length -gt 40) { $name = $name.Substring(0, 40).Trim('-') }
