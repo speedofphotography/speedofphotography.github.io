@@ -92,18 +92,13 @@
   .delivery-tile-dl { opacity: 1; width: 34px; height: 34px; right: 8px; bottom: 8px; }
 }
 
-/* A background colour chosen in SOP Studio (delivery.js sets the matching colours on <main>). The header gets
-   its solid dark bar straight away so the menu stays readable on light colours. */
-body.delivery-themed main { background: var(--bg); color: var(--text); }
-body.delivery-themed .site-header {
-  background: rgba(11, 11, 12, 0.92);
-  backdrop-filter: blur(10px);
-  border-bottom-color: #2a2a2e;
+/* A background colour chosen in SOP Studio: a rounded panel just around the photos (delivery.js sets the
+   matching colours on it). Galleries without one show the photos straight on the page, as before. */
+.delivery-stage.is-coloured { background: var(--bg); color: var(--text); padding: 20px; border-radius: 18px; }
+.delivery-stage.is-coloured .delivery-tile { --ph: linear-gradient(135deg, var(--surface), var(--bg-alt) 70%); }
+@media (max-width: 640px) {
+  .delivery-stage.is-coloured { padding: 10px; border-radius: 14px; margin: 0 -6px; }
 }
-body.delivery-themed .delivery-hero { background: var(--bg); }
-body.delivery-themed .btn-primary { color: var(--on-accent, #fff); }
-body.delivery-themed .btn-primary:hover { background: var(--accent); filter: brightness(1.12); }
-body.delivery-themed .delivery-tile { --ph: linear-gradient(135deg, var(--surface), var(--bg-alt) 70%); }
 .delivery-tile figcaption { color: #fff; }
 .delivery-lightbox { --text: #f2f2f0; --muted: #9a9aa0; --line: #2a2a2e; --surface: #1b1b1e; --accent: #2e7bff; color: #f2f2f0; }
 

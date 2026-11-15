@@ -1,14 +1,15 @@
 /* Client gallery layouts (gallery-layouts.js works out where each photo goes). Shared with SOP Studio's preview. */
 .gl { position: relative; }
-.gl > .gl-tile { position: absolute; margin: 0; box-sizing: border-box; }
+.gl > .gl-tile { position: absolute; margin: 0; box-sizing: border-box; border-radius: 10px; overflow: hidden; }
 .gl > .gl-mat {
   position: absolute;
   background: var(--gl-mat, #f4f2ed);
   box-shadow: 0 0 0 1px var(--gl-frame, rgba(0, 0, 0, 0.6)), 0 14px 30px -12px rgba(0, 0, 0, 0.55);
   border: 6px solid #141416;
+  border-radius: 10px;
   box-sizing: border-box;
 }
-.gl[data-layout="framed"] > .gl-tile { border-radius: 0; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.12); }
+.gl[data-layout="framed"] > .gl-tile { border-radius: 4px; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.12); }
 
 /* Filmstrip and Slideshow scroll sideways and snap to each photo. */
 .gl.gl-scroll {

@@ -215,11 +215,11 @@ input[type="search"] { margin-bottom: 14px; }
 .swatch.custom input::-webkit-color-swatch { border: 1px solid rgba(255, 255, 255, 0.25); border-radius: 50%; }
 .look-arrange-head { margin-top: 22px; margin-bottom: 4px; }
 .look-arrange-head .btn[aria-pressed="true"] { border-color: var(--accent); background: #16233a; }
-.look-stage { padding: 20px; border-radius: var(--radius); border: 1px solid var(--line); margin-top: 10px; overflow: hidden; }
+.look-stage { padding: 20px; border-radius: 18px; border: 1px solid var(--line); margin-top: 10px; overflow: hidden; }
 .look-stage.is-phone .look-grid { margin: 0 auto; }
 .look-grid { min-height: 60px; }
 .look-grid > .gl-tile { transition: left 0.3s ease, top 0.3s ease, width 0.3s ease, height 0.3s ease, opacity 0.2s; }
-.look-tile { background: var(--surface) center / cover no-repeat; border-radius: 3px; cursor: grab; outline: none; }
+.look-tile { background: var(--surface) center / cover no-repeat; cursor: grab; outline: none; }
 .look-tile:focus-visible { box-shadow: 0 0 0 3px var(--accent); }
 .look-tile.is-dragging { opacity: 0.35; }
 .look-tile.is-target { box-shadow: 0 0 0 3px var(--accent), 0 0 0 6px rgba(46, 123, 255, 0.35); }

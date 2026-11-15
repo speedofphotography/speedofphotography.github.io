@@ -15,7 +15,7 @@ const $ = (name) => document.querySelector(`[data-d="${name}"]`);
 const els = {
   title: $("title"), meta: $("meta"), message: $("message"), open: $("open"), actions: $("actions"),
   zip: $("zip"), zipStatus: $("zip-status"), state: $("state"), grid: $("grid"), help: $("help"), lb: $("lightbox"),
-  unlock: $("unlock"), unlockError: $("unlock-error"),
+  unlock: $("unlock"), unlockError: $("unlock-error"), stage: $("stage"),
 };
 
 const code = (location.pathname.match(/^\/g\/([^/]+)/) || [])[1] || "";
@@ -147,15 +147,13 @@ els.unlock.addEventListener("submit", async (e) => {
 let look = { layout: "masonry", bg: "" };
 const GL = window.GalleryLayouts;
 
-// The background colour chosen for this gallery, with text and panel colours to match. The header and footer
-// stay the site's own; the photo viewer stays dark.
+// The background colour chosen for this gallery: a rounded panel just around the photos (with the colours that go
+// with it). The rest of the page stays the site's own.
 function applyColour(bg) {
   const t = GL && GL.theme(bg);
   if (!t) return;
-  const main = document.querySelector("main") || document.body;
-  for (const [k, v] of Object.entries(t.vars)) main.style.setProperty(k, v);
-  document.body.classList.add("delivery-themed");
-  document.body.classList.toggle("delivery-light", t.light);
+  for (const [k, v] of Object.entries(t.vars)) els.stage.style.setProperty(k, v);
+  els.stage.classList.add("is-coloured");
 }
 
 function render(g) {
