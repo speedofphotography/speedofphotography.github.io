@@ -1,6 +1,7 @@
 // GET /api/gallery/<code>/file/<name> : one original file, straight from R2.
 // Add ?dl=1 to make the browser save it instead of showing it. Supports Range (resumable downloads).
-import { CODE_RE, typeOf, noindex, readMeta, isExpired, isClientFile } from "../../../../../_functions_lib/delivery.js";
+// A gallery with a password also needs ?k=<key> (given by POST /api/gallery/<code> after the right password).
+import { CODE_RE, typeOf, noindex, readMeta, isExpired, isClientFile, allowed } from "../../../../../_functions_lib/delivery.js";
 
 export async function onRequest({ request, params, env }) {
   if (request.method !== "GET" && request.method !== "HEAD") {
@@ -28,6 +29,7 @@ export async function onRequest({ request, params, env }) {
   }
   if (!obj) return new Response("Not found", { status: 404 });
   if (isExpired(meta)) return new Response("This gallery has expired", { status: 410 });
+  if (!(await allowed(meta, code, request.url))) return new Response("This gallery needs its password", { status: 401 });
 
   const headers = noindex(new Headers());
   obj.writeHttpMetadata(headers);

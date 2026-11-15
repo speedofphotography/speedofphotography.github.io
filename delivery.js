@@ -3,6 +3,8 @@
 // Previews and the large view are resized by Cloudflare Image Transformations (5,000 new sizes a month free;
 // each photo uses 2). If resizing isn't available, the page falls back to the originals. Previews only load as
 // they come near the screen either way. Downloads are always the untouched originals.
+// Galleries with a password ask for it first; the key the site gives back is added to every gallery address
+// (?k=) and remembered in this browser. Galleries without a password open straight away, as they always have.
 
 (() => {
 const root = document.getElementById("delivery");
@@ -11,11 +13,27 @@ const $ = (name) => document.querySelector(`[data-d="${name}"]`);
 const els = {
   title: $("title"), meta: $("meta"), message: $("message"), open: $("open"), actions: $("actions"),
   zip: $("zip"), zipStatus: $("zip-status"), state: $("state"), grid: $("grid"), help: $("help"), lb: $("lightbox"),
+  unlock: $("unlock"), unlockError: $("unlock-error"),
 };
 
 const code = (location.pathname.match(/^\/g\/([^/]+)/) || [])[1] || "";
 const enc = encodeURIComponent;
-const fileUrl = (f, dl) => `/api/gallery/${enc(code)}/file/${enc(f.name)}${dl ? "?dl=1" : ""}`;
+// The key from the password, kept in this browser so the client isn't asked again on every visit.
+const keyName = `gallery-key:${code}`;
+let key = "";
+try { key = localStorage.getItem(keyName) || ""; } catch (e) { /* storage blocked: ask each visit */ }
+const remember = (k) => {
+  key = k || "";
+  try { if (key) localStorage.setItem(keyName, key); else localStorage.removeItem(keyName); } catch (e) { /* fine */ }
+};
+const query = (dl) => {
+  const q = new URLSearchParams();
+  if (dl) q.set("dl", "1");
+  if (key) q.set("k", key);
+  const s = q.toString();
+  return s ? `?${s}` : "";
+};
+const fileUrl = (f, dl) => `/api/gallery/${enc(code)}/file/${enc(f.name)}${query(dl)}`;
 // Cloudflare resizes previews on the live site; the local preview (_delivery/preview) shows originals.
 const LOCAL = /^(localhost|127\.0\.0\.1)$/.test(location.hostname);
 let resize = !LOCAL; // switched off after the first failed resize, so every later preview asks for the original
@@ -67,8 +85,11 @@ if (!code) {
 
 // ---------- Load the gallery ----------
 let files = [];
-fetch(`/api/gallery/${enc(code)}`, { cache: "no-store" })
+const locked = new Error("password");
+function load() {
+fetch(`/api/gallery/${enc(code)}${query()}`, { cache: "no-store" })
   .then(async (res) => {
+    if (res.status === 401) throw locked;
     if (res.status === 404) throw new Error("We couldn't find that gallery. Check the link, or email me and I'll resend it.");
     if (res.status === 410) throw new Error("This gallery has expired. Email me if you need the photos again.");
     if (!res.ok) throw new Error("The gallery couldn't load right now. Please try again in a minute.");
@@ -76,10 +97,50 @@ fetch(`/api/gallery/${enc(code)}`, { cache: "no-store" })
   })
   .then(render)
   .catch((err) => {
+    if (err === locked) return askPassword();
     els.title.textContent = "Gallery unavailable";
     setState(err.message);
     els.help.hidden = false;
   });
+}
+load();
+
+// ---------- Password ----------
+function askPassword() {
+  remember(""); // a saved key that no longer works (e.g. the password was changed)
+  els.title.textContent = "Your photos";
+  setState("");
+  els.unlock.hidden = false;
+  els.help.hidden = false;
+  els.unlock.password.focus();
+}
+els.unlock.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const btn = els.unlock.querySelector("button");
+  const say = (msg) => { els.unlockError.textContent = msg; els.unlockError.hidden = !msg; };
+  btn.disabled = true;
+  say("");
+  try {
+    const res = await fetch(`/api/gallery/${enc(code)}`, {
+      method: "POST", cache: "no-store", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ password: els.unlock.password.value }),
+    });
+    if (res.ok) {
+      remember((await res.json()).k);
+      els.unlock.hidden = true;
+      els.unlock.reset();
+      setState("Loading your photos…");
+      load();
+    } else if (res.status === 401) say("That password isn't right. Check the message I sent with your link.");
+    else if (res.status === 429) say("Too many wrong tries. Please wait an hour, or email me.");
+    else if (res.status === 410) { els.unlock.hidden = true; load(); }
+    else say("Couldn't check the password right now. Please try again in a minute.");
+  } catch (err) {
+    say("Couldn't check the password right now. Please try again in a minute.");
+  } finally {
+    btn.disabled = false;
+  }
+});
 
 function render(g) {
   files = g.files || [];

@@ -40,6 +40,12 @@ const SAMPLES = {
     ],
     extra: { "Usage rights.txt": "Sample non-photo file: shows as a download tile.\n" },
   },
+  // Password: demo1234 (turned into the stored hash when the samples are made).
+  "demo-password-p9w3hz": {
+    meta: { title: "Demo: password-protected gallery", client: "Sample client", date: "2026-11-14", expires: "2099-12-31" },
+    password: "demo1234",
+    photos: ["porsche-gt3-rs-canyon.jpg", "huracan-above.jpg", "aventador-night.jpg"],
+  },
   "demo-plain-x4m2pq": { meta: null, photos: ["miata-salt-flats.jpg", "evo-x-salt-flats.jpg", "porsche-992-gt3.jpg"] },
   "demo-expired-r8t3vw": { meta: { title: "Old gallery", expires: "2024-01-31" }, photos: ["gt4-garage.jpg"] },
 };
@@ -129,7 +135,10 @@ ${body}
   if (!header) console.log("(Couldn't reach the live site, so the preview has no header or footer.)");
 }
 
-function seed() {
+const SEED_VERSION = "2"; // bump when SAMPLES change, so the next start rebuilds them
+
+async function seed() {
+  const { makeLock } = await import(new URL("../../_functions_lib/delivery.js", import.meta.url));
   console.log("Filling the pretend R2 bucket with sample galleries (first run only, about a minute)...");
   fs.rmSync(state, { recursive: true, force: true });
   const tmp = path.join(work, "seed-tmp");
@@ -148,18 +157,20 @@ function seed() {
     }
     if (g.meta) {
       const f = path.join(tmp, `${code}.json`);
-      fs.writeFileSync(f, JSON.stringify(g.meta, null, 2));
+      const meta = g.password ? { ...g.meta, access: await makeLock(g.password) } : g.meta;
+      fs.writeFileSync(f, JSON.stringify(meta, null, 2));
       put(`${code}/gallery.json`, f);
     }
   }
   fs.rmSync(tmp, { recursive: true, force: true });
-  fs.writeFileSync(path.join(state, "seeded"), new Date().toISOString());
+  fs.writeFileSync(path.join(state, "seeded"), `${SEED_VERSION} ${new Date().toISOString()}`);
   console.log(" done");
 }
 
 fs.mkdirSync(work, { recursive: true });
 await buildSite();
-if (process.argv.includes("--reseed") || !fs.existsSync(path.join(state, "seeded"))) seed();
+const seeded = fs.existsSync(path.join(state, "seeded")) ? fs.readFileSync(path.join(state, "seeded"), "utf8") : "";
+if (process.argv.includes("--reseed") || !seeded.startsWith(`${SEED_VERSION} `)) await seed();
 
 console.log(`\nClient gallery preview: http://localhost:${PORT}/g/`);
 for (const code of Object.keys(SAMPLES)) console.log(`  http://localhost:${PORT}/g/${code}/`);

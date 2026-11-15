@@ -5,9 +5,9 @@ permalink: /g/
 noindex: true
 no_fx: true
 styles:
-  - "/delivery.css?v=2"
+  - "/delivery.css?v=3"
 scripts:
-  - "/delivery.js?v=5"
+  - "/delivery.js?v=6"
 # Client photo delivery. Every gallery link (/g/<code>/) shows this page; delivery.js loads the photos.
 # How galleries are set up is explained in the comment at the top of delivery.js.
 ---
@@ -25,6 +25,15 @@ scripts:
             <input id="gallery-code" name="code" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" required placeholder="speedofphotography.com/g/your-code">
             <button type="submit" class="btn btn-primary">Open</button>
           </div>
+        </form>
+
+        <form class="delivery-open" data-d="unlock" hidden>
+          <label for="gallery-password">This gallery has a password. Enter the one I sent you with the link.</label>
+          <div class="delivery-open-row">
+            <input id="gallery-password" name="password" type="password" autocomplete="current-password" autocapitalize="off" spellcheck="false" required maxlength="200">
+            <button type="submit" class="btn btn-primary">Open</button>
+          </div>
+          <p class="delivery-unlock-error" data-d="unlock-error" aria-live="polite" hidden></p>
         </form>
 
         <div class="delivery-actions" data-d="actions" hidden>

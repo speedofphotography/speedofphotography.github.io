@@ -2,9 +2,10 @@
 //
 // Storage: the R2 bucket bound to the Pages project as DELIVERY.
 // Each client gallery is one top-level folder in that bucket; the folder name is the gallery code
-// in the link (speedofphotography.com/g/<code>/). Use a code nobody could guess, e.g. "marcus-gt3-k7q2m9":
-// there are no passwords, so the link itself is the key.
-// An optional <code>/gallery.json adds a title, client name, date, message and expiry date.
+// in the link (speedofphotography.com/g/<code>/). Use a code nobody could guess, e.g. "marcus-gt3-k7q2m9".
+// An optional <code>/gallery.json adds a title, client name, date, message and expiry date, and, for galleries
+// made with a password, "access" (a salted hash of it; see Gallery passwords below). A gallery without "access"
+// is open to anyone with the link, as every gallery was before passwords existed.
 // (This folder starts with "_" so Jekyll never publishes it.)
 
 export const CODE_RE = /^[A-Za-z0-9][A-Za-z0-9_-]{2,80}$/;
@@ -81,6 +82,7 @@ export async function readMeta(bucket, code) {
     date: text(raw.date, 40),
     message: text(raw.message, 2000),
     expires: text(raw.expires, 40),
+    lock: lockOf(raw.access),
   };
 }
 
@@ -90,3 +92,66 @@ export function isExpired(meta) {
   const t = Date.parse(meta.expires);
   return !Number.isNaN(t) && Date.now() > t + 24 * 60 * 60 * 1000;
 }
+
+// ---------- Gallery passwords ----------
+// SOP Studio saves a password as { iter, salt, hash } (PBKDF2-SHA256) in gallery.json, never the password itself.
+// After the right password, the page gets a key ("k") that it adds to every address in the gallery. The key is
+// signed with the stored hash, so changing the password (new salt and hash) makes every old key stop working.
+// Studio (Node) and the website (Cloudflare) both use these same functions.
+export const PBKDF2_ITER = 100000; // the most Cloudflare allows
+const KEY_DAYS = 30; // how long a browser stays let in before asking again
+const utf8 = new TextEncoder();
+const toB64 = (buf) => btoa(String.fromCharCode(...new Uint8Array(buf)));
+const fromB64 = (s) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
+const b64url = (buf) => toB64(buf).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+const fromB64url = (s) => fromB64(s.replace(/-/g, "+").replace(/_/g, "/") + "===".slice((s.length + 3) % 4));
+// Spaces a phone keyboard adds at the ends don't count, and accented letters compare the same however typed.
+export const cleanPassword = (p) => (typeof p === "string" ? p.normalize("NFC").trim() : "");
+
+function lockOf(a) {
+  if (!a || typeof a !== "object") return null;
+  const iter = Number(a.iter);
+  if (!Number.isInteger(iter) || iter < 1000 || iter > PBKDF2_ITER) return null;
+  try {
+    if (fromB64(a.salt).length < 16 || fromB64(a.hash).length !== 32) return null;
+  } catch { return null; }
+  return { iter, salt: a.salt, hash: a.hash };
+}
+
+async function pbkdf2(password, salt, iter) {
+  const key = await crypto.subtle.importKey("raw", utf8.encode(cleanPassword(password)), "PBKDF2", false, ["deriveBits"]);
+  return new Uint8Array(await crypto.subtle.deriveBits({ name: "PBKDF2", hash: "SHA-256", salt, iterations: iter }, key, 256));
+}
+
+export async function makeLock(password) {
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  return { iter: PBKDF2_ITER, salt: toB64(salt), hash: toB64(await pbkdf2(password, salt, PBKDF2_ITER)) };
+}
+
+export async function passwordOk(lock, password) {
+  if (!lock || !cleanPassword(password)) return false;
+  const got = await pbkdf2(password, fromB64(lock.salt), lock.iter);
+  const want = fromB64(lock.hash);
+  let diff = got.length ^ want.length;
+  for (let i = 0; i < want.length; i++) diff |= got[i] ^ want[i];
+  return diff === 0;
+}
+
+const signer = (lock) => crypto.subtle.importKey("raw", fromB64(lock.hash), { name: "HMAC", hash: "SHA-256" }, false, ["sign", "verify"]);
+
+export async function makeKey(lock, code) {
+  const exp = Math.floor(Date.now() / 1000) + KEY_DAYS * 86400;
+  const sig = await crypto.subtle.sign("HMAC", await signer(lock), utf8.encode(`${code}.${exp}`));
+  return `${exp}.${b64url(sig)}`;
+}
+
+export async function keyOk(lock, code, key) {
+  const m = /^(\d{9,11})\.([A-Za-z0-9_-]{43})$/.exec(key || "");
+  if (!lock || !m || Number(m[1]) * 1000 < Date.now()) return false;
+  try {
+    return await crypto.subtle.verify("HMAC", await signer(lock), fromB64url(m[2]), utf8.encode(`${code}.${m[1]}`));
+  } catch { return false; }
+}
+
+// Is this request let into the gallery? Open galleries always are; locked ones need a valid ?k=.
+export const allowed = async (meta, code, url) => !meta.lock || keyOk(meta.lock, code, new URL(url).searchParams.get("k"));

@@ -134,6 +134,7 @@ export function emailHref(c, s, link, expires) {
   const first = (c.name || "").split(" ")[0] || "there";
   const what = s?.car ? `your ${s.car} shoot` : "your shoot";
   const body = `Hi ${first},\n\nThe photos from ${what} are ready:\n${link}\n\n` +
+    (s?.galleryPass ? `Password: ${s.galleryPass}\n\n` : "") +
     (expires ? `You can view and download them until ${day(expires)}.\n\n` : "") + "Thanks again!\nSpeed Of Photography";
   return `mailto:${encodeURIComponent(c.email)}?subject=${encodeURIComponent("Your photos are ready")}&body=${encodeURIComponent(body)}`;
 }
@@ -339,7 +340,7 @@ export async function clientForm(id, then) {
     if (!c) doc.clients.push(target);
     await save();
     toast(c ? "Saved." : "Client added.");
-    go(then === "shoot" ? `#/shoots/new?client=${target.id}` : `#/clients/${target.id}`);
+    go(then === "shoot" ? `#/shoots/new?client=${target.id}` : then === "gallery" ? `#/galleries/new?client=${target.id}` : `#/clients/${target.id}`);
   });
   show(back(c ? `#/clients/${c.id}` : "#/clients", c ? c.name : "Clients"), form);
   form.querySelector("input").focus();
@@ -508,6 +509,8 @@ function galleryPanel(s, c, { createGallery, loadAlbums, refresh }) {
         h("button", { type: "button", class: "btn btn-primary small", onclick: () => copy(link) }, "Copy link"),
         c?.email ? h("a", { class: "btn btn-line small", href: emailHref(c, s, link) }, "Email link") : null,
         h("a", { href: `#/g/${s.gallery}`, class: "btn btn-line small" }, "Manage photos")),
+      s.galleryPass ? h("p", { class: "muted" }, "Password: ", h("code", {}, s.galleryPass), " ",
+        h("button", { type: "button", class: "linkish", onclick: () => copy(s.galleryPass, "Password") }, "Copy")) : null,
       h("button", { type: "button", class: "linkish", onclick: async () => {
         if (!confirm("Unlink this gallery from the shoot? The gallery itself stays.")) return;
         s.gallery = "";
@@ -515,20 +518,8 @@ function galleryPanel(s, c, { createGallery, loadAlbums, refresh }) {
       } }, "Unlink gallery"));
     return box;
   }
-  const make = h("button", { type: "button", class: "btn btn-primary", onclick: async () => {
-    make.disabled = true;
-    try {
-      const code = await createGallery({
-        client: c?.name || "", car: s.car, date: s.date || today(), expires: endFor(galleryDays()),
-        title: s.title || (c && s.car ? `${c.name}'s ${s.car}` : c ? `${c.name}'s photos` : "Your photos"),
-        message: "Thanks for a great shoot! Let me know if you'd like any extra edits.",
-      });
-      s.gallery = code;
-      if (["inquiry", "booked", "shot"].includes(s.status)) s.status = "editing";
-      await save();
-      go(`#/g/${code}`);
-    } catch (e) { make.disabled = false; if (!(e instanceof Locked)) toast(e.message, true); }
-  } }, "Create gallery for this shoot");
+  const make = c ? h("a", { href: `#/galleries/new?shoot=${s.id}`, class: "btn btn-primary" }, "Create gallery for this shoot")
+    : h("p", { class: "muted" }, "Pick a client for this shoot first (Edit) to make its gallery.");
   const pickBox = h("div", { class: "add-row" });
   box.append(h("p", { class: "muted" }, "No gallery yet. Make one when the edits are ready; the link, title and date are filled in from this shoot."),
     h("div", { class: "row" }, make), pickBox);
@@ -544,4 +535,126 @@ function galleryPanel(s, c, { createGallery, loadAlbums, refresh }) {
       } }, "Link"));
   }).catch(() => {});
   return box;
+}
+
+// ---------- new gallery ----------
+// Every new gallery is for a client in your records and is linked to one of their shoots: one picked here, or a new
+// shoot made with it. It has a password unless you untick the box. The password is kept with the shoot (encrypted
+// like all your records) so you can see it again, and "Email link" puts it in the message.
+const PASS_ABC = "abcdefghjkmnpqrstuvwxyz23456789";
+export function makePassword() {
+  const out = Array.from(crypto.getRandomValues(new Uint32Array(8)), (n) => PASS_ABC[n % PASS_ABC.length]).join("");
+  return `${out.slice(0, 4)}-${out.slice(4)}`;
+}
+export const MIN_PASS = 4;
+
+// The password box for a gallery: on by default, with a suggestion you can replace with your own.
+export function passwordBox(value = makePassword(), on = true) {
+  const box = h("input", { type: "checkbox", checked: on });
+  const input = h("input", { maxlength: "200", value, autocomplete: "off", spellcheck: "false", "aria-label": "Gallery password" });
+  const row = h("div", { class: "row pass-row" }, input,
+    h("button", { type: "button", class: "btn btn-line small", onclick: () => { input.value = makePassword(); input.focus(); } }, "Suggest one"));
+  const sync = () => { row.hidden = !box.checked; input.required = box.checked; };
+  box.addEventListener("change", () => { sync(); if (box.checked) input.focus(); });
+  sync();
+  return {
+    el: h("div", { class: "field" }, h("span", {}, "Password"),
+      h("label", { class: "check" }, box, " Clients need a password to open it"), row,
+      h("small", {}, "Type your own or keep the suggestion, and send it to the client with the link (Email link includes it). Untick to let anyone with the link open it.")),
+    value: () => {
+      if (!box.checked) return "";
+      const v = input.value.trim();
+      if (v.length < MIN_PASS) throw new Error(`Choose a password of at least ${MIN_PASS} characters, or untick the password box.`);
+      return v;
+    },
+  };
+}
+
+export async function galleryForm(q, { createGallery, lengthField }) {
+  await load();
+  const preShoot = shootOf(q.get("shoot") || "");
+  if (preShoot?.gallery) return go(`#/g/${preShoot.gallery}`);
+  const clients = [...doc.clients].sort((a, b) => a.name.localeCompare(b.name));
+  if (!clients.length) {
+    return show(back("#/galleries", "Galleries"), h("section", { class: "panel narrow" }, h("h1", {}, "New gallery"),
+      h("p", {}, "Every gallery is for a client in your records, and you don't have any yet."),
+      h("a", { href: "#/clients/new?then=gallery", class: "btn btn-primary" }, "Add a client")));
+  }
+  const clientSel = select("clientId", [["", "Pick a client…"], ...clients.map((c) => [c.id, c.name])],
+    preShoot?.clientId || q.get("client") || "", { required: true });
+  const shootSel = h("select", { name: "shootId", "aria-label": "Shoot" });
+  const carInput = h("input", { name: "car", maxlength: "120" });
+  const carList = h("datalist", { id: "gallery-car-list" });
+  carInput.setAttribute("list", "gallery-car-list");
+  const dateInput = h("input", { name: "date", type: "date", value: preShoot?.date || today() });
+  const length = lengthField(galleryDays());
+  const pass = passwordBox();
+
+  // The client's shoots that don't have a gallery yet; the newest one that's been shot is picked to start with.
+  function fillShoots() {
+    const c = clientOf(clientSel.value);
+    const open = c ? shootsOf(c.id).filter((s) => !s.gallery && s.status !== "cancelled") : [];
+    shootSel.replaceChildren(...open.map((s) => h("option", { value: s.id }, `${s.car || shootName(s)}${s.date ? ` (${day(s.date)})` : ""}`)),
+      h("option", { value: "new" }, "New shoot (made with this gallery)"));
+    const pick = preShoot && open.includes(preShoot) ? preShoot : open.find((s) => ["shot", "editing"].includes(s.status));
+    shootSel.value = pick ? pick.id : "new";
+    carList.replaceChildren(...carsOf(c).map((x) => h("option", { value: x })));
+    fillFromShoot();
+  }
+  function fillFromShoot() {
+    const s = shootOf(shootSel.value);
+    const c = clientOf(clientSel.value);
+    carInput.value = s?.car || carsOf(c)[0] || "";
+    if (s?.date) dateInput.value = s.date;
+  }
+  clientSel.addEventListener("change", fillShoots);
+  shootSel.addEventListener("change", fillFromShoot);
+  fillShoots();
+
+  const form = busyForm(h("form", { class: "panel narrow", autocomplete: "off" },
+    h("h1", {}, "New gallery"),
+    field("Client", clientSel, h("span", {}, "Not listed? ", h("a", { href: "#/clients/new?then=gallery" }, "Add a new client"), ".")),
+    field("Shoot", shootSel, "The gallery is linked to this shoot in your records."),
+    field("Car", [carInput, carList], "Goes into the link and the default title."),
+    field("Title", h("input", { name: "title", maxlength: "120" }), "Leave blank for \"Client's Car\"."),
+    field("Shoot date", dateInput),
+    length.el,
+    pass.el,
+    field("Note to the client", h("textarea", { name: "message", rows: "3", maxlength: "2000" },
+      "Thanks for a great shoot! Let me know if you'd like any extra edits.")),
+    h("button", { type: "submit", class: "btn btn-primary" }, "Create gallery")),
+  async (d) => {
+    const c = clientOf(clientSel.value);
+    if (!c) throw new Error("Pick a client for this gallery.");
+    const password = pass.value();
+    const car = carInput.value.trim();
+    const date = dateInput.value;
+    const code = await createGallery({
+      clientId: c.id, client: c.name, car, date, expires: length.end(),
+      title: String(d.get("title") || "").trim() || (car ? `${c.name}'s ${car}` : `${c.name}'s photos`),
+      message: String(d.get("message") || ""), password, open: !password,
+    });
+    let s = shootOf(shootSel.value);
+    if (!s) {
+      s = { id: newId(), created: now(), clientId: c.id, car, title: "", date, time: "", location: "", package: "",
+        status: "editing", payment: "unpaid", amount: "", notes: "", gallery: "" };
+      doc.shoots.push(s);
+    } else if (["inquiry", "booked", "shot"].includes(s.status)) s.status = "editing";
+    s.gallery = code;
+    s.galleryPass = password;
+    if (car && !carsOf(c).some((x) => x.toLowerCase() === car.toLowerCase())) c.cars = [...carsOf(c), car].join("\n");
+    try { await save(); }
+    catch (e) { if (!(e instanceof Locked)) toast(`Gallery made, but linking it to the shoot didn't save: ${e.message}`, true); }
+    go(`#/g/${code}`);
+  });
+  show(back(preShoot ? `#/shoots/${preShoot.id}` : "#/galleries", preShoot ? shootName(preShoot) : "Galleries"), form);
+}
+
+// After a gallery's password changes in Studio, the shoot it belongs to remembers the new one.
+export async function setGalleryPass(code, password) {
+  await load();
+  const s = doc.shoots.find((x) => x.gallery === code);
+  if (!s || (s.galleryPass || "") === password) return;
+  s.galleryPass = password;
+  await save();
 }

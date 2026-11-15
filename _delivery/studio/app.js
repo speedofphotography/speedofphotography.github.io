@@ -85,7 +85,7 @@ async function albumsScreen() {
         h("h2", {}, h("a", { href: `#/g/${a.code}` }, a.title || a.client || a.code)),
         h("p", { class: "muted" }, who ? h("a", { href: `#/shoots/${shoot.id}` }, who.name) : a.client && a.title ? a.client : "",
           a.date ? `${who || (a.client && a.title) ? " · " : ""}${day(a.date)}` : ""),
-        h("p", {}, `${plural(a.count, "file")}${a.count ? ` · ${size(a.size)}` : ""}`),
+        h("p", {}, `${plural(a.count, "file")}${a.count ? ` · ${size(a.size)}` : ""}${a.locked ? " · Password" : ""}`),
         h("p", { class: a.expired ? "warn" : "muted" }, a.expired ? `Expired ${day(a.expires)}` : a.expires ? `Open until ${day(a.expires)}` : "No end date")),
       h("button", { type: "button", class: "btn btn-line small", onclick: () => copy(a.link) }, "Copy link"));
   }));
@@ -105,27 +105,6 @@ function lengthField(days) {
   };
 }
 
-async function newGalleryScreen() {
-  await crm.load();
-  const length = lengthField(crm.galleryDays());
-  const form = h("form", { class: "panel narrow", autocomplete: "off" },
-    h("h1", {}, "New gallery"),
-    h("p", { class: "muted" }, "Tip: making it from a shoot (Shoots > the shoot > Create gallery) fills this in and keeps it linked to the client."),
-    field("Client name", h("input", { name: "client", maxlength: "120" })),
-    field("Car", h("input", { name: "car", maxlength: "120" }), "Goes into the link and the default title."),
-    field("Title", h("input", { name: "title", maxlength: "120" }), "Leave blank for \"Client's Car\"."),
-    field("Shoot date", h("input", { name: "date", type: "date", value: isoIn(0) })),
-    length.el,
-    field("Note to the client", h("textarea", { name: "message", rows: "3", maxlength: "2000" },
-      "Thanks for a great shoot! Let me know if you'd like any extra edits.")),
-    h("button", { type: "submit", class: "btn btn-primary" }, "Create gallery"));
-  show(back("#/galleries", "Galleries"), busyForm(form, async (d) => {
-    const body = Object.fromEntries(d);
-    body.expires = length.end();
-    if (!body.title) body.title = body.client && body.car ? `${body.client}'s ${body.car}` : body.client ? `${body.client}'s photos` : body.car || "Your photos";
-    go(`#/g/${await createGallery(body)}`);
-  }));
-}
 
 async function albumScreen(code) {
   show(h("p", { class: "muted" }, "Loading…"));
@@ -293,6 +272,54 @@ async function albumScreen(code) {
     toast(a.expires ? `Saved. Open until ${day(a.expires)}.` : "Saved. No end date.");
   });
 
+  // ----- password -----
+  // Galleries made before passwords existed have none; one can be added here, but nothing changes unless you do.
+  const passPanel = h("section", { class: "panel" });
+  function showPass() {
+    const known = shoot?.galleryPass || "";
+    const editBox = crm.passwordBox(known || crm.makePassword(), true);
+    const saveBtn = h("button", { type: "button", class: "btn btn-primary small", onclick: async () => {
+      let password;
+      try { password = editBox.value(); } catch (e) { return toast(e.message, true); }
+      if (!password) return toast("Type a password, or use Remove password.", true);
+      saveBtn.disabled = true;
+      try {
+        await api("PUT", `/api/albums/${enc(code)}/password`, { password });
+        await crm.setGalleryPass(code, password);
+        a.locked = true;
+        dropAlbums();
+        toast("Password saved. Send the new one to the client.");
+        showPass();
+      } catch (e) { saveBtn.disabled = false; if (!(e instanceof Locked)) toast(e.message, true); }
+    } }, a.locked ? "Change password" : "Add password");
+    const form = h("div", { hidden: true }, editBox.el, h("div", { class: "row" }, saveBtn,
+      h("button", { type: "button", class: "btn btn-line small", onclick: () => { form.hidden = true; opener.hidden = false; } }, "Cancel")));
+    editBox.el.querySelector(".check").hidden = true; // here the box is always on; "Remove password" turns it off
+    const opener = h("div", { class: "row" },
+      h("button", { type: "button", class: "btn btn-line small", onclick: () => { form.hidden = false; opener.hidden = true; } },
+        a.locked ? "Change password" : "Add a password"),
+      a.locked ? h("button", { type: "button", class: "btn btn-line small", onclick: async (e) => {
+        if (!confirm("Remove the password? Anyone with the link will be able to open this gallery.")) return;
+        e.target.disabled = true;
+        try {
+          await api("PUT", `/api/albums/${enc(code)}/password`, { password: "" });
+          await crm.setGalleryPass(code, "");
+          a.locked = false;
+          dropAlbums();
+          toast("Password removed. Anyone with the link can open it now.");
+          showPass();
+        } catch (ex) { e.target.disabled = false; if (!(ex instanceof Locked)) toast(ex.message, true); }
+      } }, "Remove password") : null);
+    passPanel.replaceChildren(h("h2", {}, "Password"),
+      a.locked
+        ? (known ? h("p", {}, "Clients need this password to open the gallery: ", h("code", {}, known), " ",
+            h("button", { type: "button", class: "linkish", onclick: () => copy(known, "Password") }, "Copy"))
+          : h("p", {}, "Clients need a password to open this gallery. (It isn't saved in your records, so if you've lost it, change it.)"))
+        : h("p", { class: "muted" }, "No password: anyone with the link can open this gallery."),
+      opener, form);
+  }
+  showPass();
+
   const until = h("p", {});
   function showUntil() {
     until.className = a.expired ? "warn" : "muted";
@@ -315,6 +342,7 @@ async function albumScreen(code) {
     drop, fileInput, progress,
     h("div", { class: "head files-head" }, h("h2", {}, "Files"), countLine, delBtn),
     grid,
+    passPanel,
     details,
     h("section", { class: "panel danger" },
       h("h2", {}, "Delete gallery"),
@@ -448,7 +476,7 @@ async function route() {
     else if ((m = /^\/shoots\/([\w-]+)\/edit$/.exec(path))) await crm.shootForm(m[1]);
     else if ((m = /^\/shoots\/([\w-]+)$/.exec(path))) await crm.shootScreen(m[1], deps);
     else if (path === "/galleries") await albumsScreen();
-    else if (path === "/galleries/new") await newGalleryScreen();
+    else if (path === "/galleries/new") await crm.galleryForm(q, { createGallery, lengthField });
     else if ((m = /^\/g\/([^/]+)$/.exec(path))) await albumScreen(decodeURIComponent(m[1]));
     else if (path === "/settings") await settingsScreen();
     else go("#/");

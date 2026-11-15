@@ -54,6 +54,9 @@ p { margin: 0 0 8px; }
 .field { display: block; margin-bottom: 16px; }
 .field span { display: block; margin-bottom: 6px; color: var(--muted); font-size: 0.9rem; }
 .field small { display: block; margin-top: 6px; color: var(--muted); font-size: 0.82rem; }
+.field .check { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; color: var(--text); cursor: pointer; }
+.pass-row { align-items: center; gap: 8px; }
+.pass-row input { flex: 1; min-width: 0; width: auto; }
 input, textarea, select { width: 100%; padding: 11px 12px; font: inherit; color: var(--text); background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); }
 input:focus, textarea:focus, select:focus { outline: none; border-color: var(--accent); }
 input[type="checkbox"] { width: auto; accent-color: var(--accent); margin: 0; }

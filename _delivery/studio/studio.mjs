@@ -22,7 +22,7 @@ const repo = path.resolve(here, "..", "..");
 // Installed (install-studio.ps1), the app carries its own copy of the site's gallery rules and logo;
 // run from the website folder, it uses the originals.
 const installed = fs.existsSync(path.join(here, "lib", "delivery.js"));
-const { CODE_RE, META_FILE, typeOf, kindOf, isClientFile, readMeta, isExpired } =
+const { CODE_RE, META_FILE, typeOf, kindOf, isClientFile, readMeta, isExpired, makeLock, cleanPassword } =
   await import(installed ? "./lib/delivery.js" : "../../_functions_lib/delivery.js");
 const SITE = "https://speedofphotography.com";
 const IDLE_MS = 30 * 60 * 1000;
@@ -228,11 +228,15 @@ async function eachLimit(items, limit, fn) {
   return out;
 }
 
+// A password needs at least this many characters. Galleries made before passwords existed have none and stay open.
+const MIN_PASS = 4;
+const saveMetaFile = (code, meta) => state.r2.put(`${code}/${META_FILE}`, JSON.stringify(meta, null, 2) + "\n", "application/json");
+
 async function summary(code) {
   const [{ files }, meta] = await Promise.all([filesOf(code), metaOf(code)]);
-  const { found, ...details } = meta;
+  const { found, lock, ...details } = meta;
   return {
-    code, link: linkFor(code), ...details, expired: isExpired(meta),
+    code, link: linkFor(code), ...details, locked: !!lock, expired: isExpired(meta),
     count: files.length, size: files.reduce((s, f) => s + f.size, 0),
     updated: files.reduce((m, f) => (f.modified > m ? f.modified : m), ""),
     cover: (files.find((f) => f.thumb) || {}).name || "",
@@ -375,30 +379,51 @@ const api = {
     send(res, 200, { albums });
   },
 
+  // Every new gallery is for a client in your records, and has a password unless you chose to leave it open.
   async createAlbum(req, res) {
     const b = await readJson(req);
+    const doc = await state.crm.load();
+    if (!doc.clients.some((c) => c.id === b.clientId)) return fail(res, 400, "Pick a client for this gallery.");
+    const open = b.open === true;
+    const password = cleanPassword(b.password);
+    if (!open && password.length < MIN_PASS) return fail(res, 400, `Choose a password of at least ${MIN_PASS} characters, or untick the password box.`);
     const meta = cleanMeta(b);
+    if (!open) meta.access = await makeLock(password);
     let code;
     for (let i = 0; i < 5 && !code; i++) {
       const c = makeCode(text(b.client, 120), text(b.car, 120));
       if (!(await state.r2.list({ prefix: `${c}/`, max: 1 })).objects.length) code = c;
     }
     if (!code) return fail(res, 500, "Couldn't make a new link. Try again.");
-    await state.r2.put(`${code}/${META_FILE}`, JSON.stringify(meta, null, 2) + "\n", "application/json");
+    await saveMetaFile(code, meta);
     send(res, 200, { code, link: linkFor(code) });
   },
 
   async getAlbum(req, res, code) {
     const [{ files }, meta] = await Promise.all([filesOf(code), metaOf(code)]);
     if (!files.length && !meta.found) return fail(res, 404, "There's no gallery with that link.");
-    const { found, ...details } = meta;
-    send(res, 200, { code, link: linkFor(code), ...details, expired: isExpired(meta), files });
+    const { found, lock, ...details } = meta;
+    send(res, 200, { code, link: linkFor(code), ...details, locked: !!lock, expired: isExpired(meta), files });
   },
 
+  // Saving the details keeps the gallery's password (or lack of one) as it is.
   async saveMeta(req, res, code) {
-    const meta = cleanMeta(await readJson(req));
-    await state.r2.put(`${code}/${META_FILE}`, JSON.stringify(meta, null, 2) + "\n", "application/json");
+    const [meta, old] = [cleanMeta(await readJson(req)), await metaOf(code)];
+    if (old.lock) meta.access = old.lock;
+    await saveMetaFile(code, meta);
     send(res, 200, { ok: true });
+  },
+
+  // { password }: sets or changes the password. An empty one removes it, so anyone with the link can open it.
+  async setPassword(req, res, code) {
+    const password = cleanPassword((await readJson(req)).password);
+    if (password && password.length < MIN_PASS) return fail(res, 400, `Use at least ${MIN_PASS} characters.`);
+    const old = await metaOf(code);
+    if (!old.found) return fail(res, 404, "There's no gallery with that link.");
+    const meta = cleanMeta(old);
+    if (password) meta.access = await makeLock(password);
+    await saveMetaFile(code, meta);
+    send(res, 200, { locked: !!password });
   },
 
   async deleteAlbum(req, res, code) {
@@ -483,7 +508,7 @@ async function route(req, res, url) {
   if (pathname === "/api/albums" && m === "GET") return api.listAlbums(req, res);
   if (pathname === "/api/albums" && m === "POST") return api.createAlbum(req, res);
 
-  const a = /^\/api\/albums\/([^/]+)(?:\/(meta|files|thumbs)(?:\/([^/]+))?)?$/.exec(pathname);
+  const a = /^\/api\/albums\/([^/]+)(?:\/(meta|password|files|thumbs)(?:\/([^/]+))?)?$/.exec(pathname);
   if (!a) return fail(res, 404, "Not found.");
   let code, name;
   try { code = decodeURIComponent(a[1]); name = a[3] === undefined ? undefined : decodeURIComponent(a[3]); }
@@ -494,6 +519,7 @@ async function route(req, res, url) {
     if (m === "GET") return api.getAlbum(req, res, code);
     if (m === "DELETE") return api.deleteAlbum(req, res, code);
   } else if (part === "meta" && name === undefined && m === "PUT") return api.saveMeta(req, res, code);
+  else if (part === "password" && name === undefined && m === "PUT") return api.setPassword(req, res, code);
   else if (name !== undefined) {
     if (!okName(name)) return fail(res, 400, "That file name can't be used. Rename it without slashes and try again.");
     if (part === "files" && m === "PUT") return api.upload(req, res, code, name);
