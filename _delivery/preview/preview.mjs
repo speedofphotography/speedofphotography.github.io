@@ -46,6 +46,13 @@ const SAMPLES = {
     password: "demo1234",
     photos: ["porsche-gt3-rs-canyon.jpg", "huracan-above.jpg", "aventador-night.jpg"],
   },
+  // A layout, an arranged order and a background colour chosen in Studio.
+  "demo-layout-m5c8wd": {
+    meta: { title: "Demo: magazine layout on paper", client: "Sample client", date: "2026-11-15", expires: "2099-12-31",
+      layout: "mosaic", bg: "#f2eee5", order: ["IMG_0005.jpg", "IMG_0001.jpg"] },
+    photos: ["porsche-gt3-rs-canyon.jpg", "huracan-above.jpg", "laferrari-doors-up.jpg", "porsche-993-turbo.jpg",
+      "aventador-night.jpg", "emira-track-rolling.jpg", "gt4-garage.jpg", "lamborghini-interior.jpg", "carrera-gt-garage.jpg"],
+  },
   "demo-plain-x4m2pq": { meta: null, photos: ["miata-salt-flats.jpg", "evo-x-salt-flats.jpg", "porsche-992-gt3.jpg"] },
   "demo-expired-r8t3vw": { meta: { title: "Old gallery", expires: "2024-01-31" }, photos: ["gt4-garage.jpg"] },
 };
@@ -74,7 +81,7 @@ function homePage(live) {
 async function buildSite() {
   fs.rmSync(site, { recursive: true, force: true });
   fs.mkdirSync(path.join(site, "g"), { recursive: true });
-  for (const f of ["style.css", "script.js", "delivery.css", "delivery.js", "favicon.ico", "favicon-32.png", "apple-touch-icon.png"]) {
+  for (const f of ["style.css", "script.js", "gallery-layouts.css", "gallery-layouts.js", "delivery.css", "delivery.js", "favicon.ico", "favicon-32.png", "apple-touch-icon.png"]) {
     if (fs.existsSync(path.join(repo, f))) fs.copyFileSync(path.join(repo, f), path.join(site, f));
   }
   fs.copyFileSync(path.join(repo, "g", "sw.js"), path.join(site, "g", "sw.js"));
@@ -108,6 +115,7 @@ async function buildSite() {
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,500;0,700;1,700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/style.css">
+  <link rel="stylesheet" href="/gallery-layouts.css">
   <link rel="stylesheet" href="/delivery.css">
 </head>
 <body>
@@ -117,6 +125,7 @@ ${body}
   </main>
   ${footer.replace(/(src|href)="\/(?!\/)/g, `$1="${LIVE}/`) || '<footer class="site-footer"><div class="footer-inner"><p class="copyright">&copy; <span id="year"></span></p></div></footer>'}
   <script src="/script.js"></script>
+  <script src="/gallery-layouts.js"></script>
   <script src="/delivery.js"></script>
 </body>
 </html>
@@ -135,7 +144,7 @@ ${body}
   if (!header) console.log("(Couldn't reach the live site, so the preview has no header or footer.)");
 }
 
-const SEED_VERSION = "2"; // bump when SAMPLES change, so the next start rebuilds them
+const SEED_VERSION = "3"; // bump when SAMPLES change, so the next start rebuilds them
 
 async function seed() {
   const { makeLock } = await import(new URL("../../_functions_lib/delivery.js", import.meta.url));

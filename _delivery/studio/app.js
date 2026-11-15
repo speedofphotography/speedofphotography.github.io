@@ -2,6 +2,7 @@
 // Everything goes through the local app (studio.mjs); this page never sees the R2 keys.
 import { app, info, hooks, h, show, toast, api, Locked, enc, fileUrl, size, day, isoIn, plural, copy, field, busyForm, back, go } from "./ui.js";
 import * as crm from "./crm.js";
+import { lookPanel } from "./look.js";
 
 const nav = document.querySelector(".bar-actions");
 let uploading = 0;
@@ -140,6 +141,7 @@ async function albumScreen(code) {
       h("figcaption", {}, h("label", {}, box, h("span", {}, f.name)), h("small", {}, size(f.size))));
   }
   function render() {
+    look?.update(a.files);
     grid.replaceChildren(...a.files.map(tile));
     countLine.textContent = a.files.length ? `${plural(a.files.length, "file")} · ${size(a.files.reduce((s, f) => s + f.size, 0))}` : "No files yet.";
     selected.clear();
@@ -320,6 +322,9 @@ async function albumScreen(code) {
   }
   showPass();
 
+  // ----- layout and colour -----
+  const look = lookPanel(code, a);
+
   const until = h("p", {});
   function showUntil() {
     until.className = a.expired ? "warn" : "muted";
@@ -342,6 +347,7 @@ async function albumScreen(code) {
     drop, fileInput, progress,
     h("div", { class: "head files-head" }, h("h2", {}, "Files"), countLine, delBtn),
     grid,
+    look.el,
     passPanel,
     details,
     h("section", { class: "panel danger" },

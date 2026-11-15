@@ -5,9 +5,11 @@ permalink: /g/
 noindex: true
 no_fx: true
 styles:
-  - "/delivery.css?v=3"
+  - "/gallery-layouts.css?v=1"
+  - "/delivery.css?v=4"
 scripts:
-  - "/delivery.js?v=6"
+  - "/gallery-layouts.js?v=1"
+  - "/delivery.js?v=7"
 # Client photo delivery. Every gallery link (/g/<code>/) shows this page; delivery.js loads the photos.
 # How galleries are set up is explained in the comment at the top of delivery.js.
 ---
@@ -45,7 +47,7 @@ scripts:
 
     <section class="section delivery-section" aria-label="Photos">
       <p class="delivery-state" data-d="state" aria-live="polite">Loading your photos&hellip;</p>
-      <div class="gallery masonry delivery-grid" data-d="grid"></div>
+      <div class="delivery-grid" data-d="grid"></div>
       <p class="delivery-help" data-d="help" hidden>
         Questions about your photos? <a href="mailto:{{ c.contact.email | escape }}">Email me</a>.
       </p>

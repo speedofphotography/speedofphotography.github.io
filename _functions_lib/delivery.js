@@ -6,6 +6,8 @@
 // An optional <code>/gallery.json adds a title, client name, date, message and expiry date, and, for galleries
 // made with a password, "access" (a salted hash of it; see Gallery passwords below). A gallery without "access"
 // is open to anyone with the link, as every gallery was before passwords existed.
+// It can also say how the page looks (see Layouts below): "layout", "order" and "bg". Without them the page shows
+// the staggered layout, files in name order, on the site's own colours.
 // (This folder starts with "_" so Jekyll never publishes it.)
 
 export const CODE_RE = /^[A-Za-z0-9][A-Za-z0-9_-]{2,80}$/;
@@ -83,7 +85,41 @@ export async function readMeta(bucket, code) {
     message: text(raw.message, 2000),
     expires: text(raw.expires, 40),
     lock: lockOf(raw.access),
+    ...cleanLook(raw),
   };
+}
+
+// ---------- Layouts ----------
+// Chosen in SOP Studio. The page draws them with /gallery-layouts.js, which has the same list of ids.
+export const LAYOUTS = ["masonry", "grid", "rows", "feature", "column", "pairs", "mosaic", "alternate",
+  "widescreen", "filmstrip", "slideshow", "framed"];
+const HEX = /^#[0-9a-fA-F]{6}$/;
+const MAX_ORDER = 5000;
+
+// { layout, bg, order } from gallery.json (or from Studio), keeping only what's valid. Missing means "as before".
+export function cleanLook(raw) {
+  const look = {};
+  if (!raw || typeof raw !== "object") return look;
+  if (LAYOUTS.includes(raw.layout)) look.layout = raw.layout;
+  if (typeof raw.bg === "string" && HEX.test(raw.bg)) look.bg = raw.bg.toLowerCase();
+  if (Array.isArray(raw.order)) {
+    const seen = new Set();
+    for (const n of raw.order.slice(0, MAX_ORDER)) {
+      if (typeof n === "string" && n.length <= 300 && isClientFile(n) && !seen.has(n)) seen.add(n);
+    }
+    if (seen.size) look.order = [...seen];
+  }
+  return look;
+}
+
+// Files in the order chosen in Studio; anything not placed yet (new uploads) follows, in name order.
+export function arrange(files, order) {
+  const byName = (a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: "base" });
+  const sorted = [...files].sort(byName);
+  if (!order || !order.length) return sorted;
+  const spot = new Map(order.map((n, i) => [n, i]));
+  const placed = sorted.filter((f) => spot.has(f.name)).sort((a, b) => spot.get(a.name) - spot.get(b.name));
+  return [...placed, ...sorted.filter((f) => !spot.has(f.name))];
 }
 
 // A gallery stays open through the whole expiry day.

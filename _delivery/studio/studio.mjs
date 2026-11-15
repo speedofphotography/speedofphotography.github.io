@@ -22,7 +22,7 @@ const repo = path.resolve(here, "..", "..");
 // Installed (install-studio.ps1), the app carries its own copy of the site's gallery rules and logo;
 // run from the website folder, it uses the originals.
 const installed = fs.existsSync(path.join(here, "lib", "delivery.js"));
-const { CODE_RE, META_FILE, typeOf, kindOf, isClientFile, readMeta, isExpired, makeLock, cleanPassword } =
+const { CODE_RE, META_FILE, typeOf, kindOf, isClientFile, readMeta, isExpired, makeLock, cleanPassword, cleanLook } =
   await import(installed ? "./lib/delivery.js" : "../../_functions_lib/delivery.js");
 const SITE = "https://speedofphotography.com";
 const IDLE_MS = 30 * 60 * 1000;
@@ -146,6 +146,10 @@ const STATIC = {
   "/app.js": ["app.js", "text/javascript; charset=utf-8"],
   "/ui.js": ["ui.js", "text/javascript; charset=utf-8"],
   "/crm.js": ["crm.js", "text/javascript; charset=utf-8"],
+  "/look.js": ["look.js", "text/javascript; charset=utf-8"],
+  // The website's own layout code, so the preview here matches the client's page exactly.
+  "/gallery-layouts.js": [path.join(installed ? path.join(here, "lib") : repo, "gallery-layouts.js"), "text/javascript; charset=utf-8"],
+  "/gallery-layouts.css": [path.join(installed ? path.join(here, "lib") : repo, "gallery-layouts.css"), "text/css; charset=utf-8"],
   "/logo.png": [installed ? path.join(here, "logo.png") : path.join(repo, "images", "logo-small.png"), "image/png"],
 };
 
@@ -197,7 +201,7 @@ function cleanMeta(body) {
   if (DATE_RE.test(date)) meta.date = date;
   if (message) meta.message = message;
   if (DATE_RE.test(expires)) meta.expires = expires;
-  return meta;
+  return Object.assign(meta, cleanLook(body)); // layout, order and background colour, if any
 }
 
 // readMeta() from the site's own code, so this app reads gallery.json exactly the way the client page does.
@@ -234,7 +238,7 @@ const saveMetaFile = (code, meta) => state.r2.put(`${code}/${META_FILE}`, JSON.s
 
 async function summary(code) {
   const [{ files }, meta] = await Promise.all([filesOf(code), metaOf(code)]);
-  const { found, lock, ...details } = meta;
+  const { found, lock, order, ...details } = meta;
   return {
     code, link: linkFor(code), ...details, locked: !!lock, expired: isExpired(meta),
     count: files.length, size: files.reduce((s, f) => s + f.size, 0),
@@ -406,12 +410,27 @@ const api = {
     send(res, 200, { code, link: linkFor(code), ...details, locked: !!lock, expired: isExpired(meta), files });
   },
 
-  // Saving the details keeps the gallery's password (or lack of one) as it is.
+  // Saving the details keeps the gallery's password (or lack of one) and its layout as they are.
   async saveMeta(req, res, code) {
     const [meta, old] = [cleanMeta(await readJson(req)), await metaOf(code)];
+    for (const k of ["layout", "bg", "order"]) delete meta[k];
+    Object.assign(meta, cleanLook(old));
     if (old.lock) meta.access = old.lock;
     await saveMetaFile(code, meta);
     send(res, 200, { ok: true });
+  },
+
+  // { layout, bg, order }: how the client's page looks. An empty bg means the site's own colours.
+  async setLook(req, res, code) {
+    const look = cleanLook(await readJson(req));
+    const old = await metaOf(code);
+    if (!old.found && !(await filesOf(code)).files.length) return fail(res, 404, "There's no gallery with that link.");
+    const meta = cleanMeta(old);
+    for (const k of ["layout", "bg", "order"]) delete meta[k];
+    Object.assign(meta, look);
+    if (old.lock) meta.access = old.lock;
+    await saveMetaFile(code, meta);
+    send(res, 200, look);
   },
 
   // { password }: sets or changes the password. An empty one removes it, so anyone with the link can open it.
@@ -508,7 +527,7 @@ async function route(req, res, url) {
   if (pathname === "/api/albums" && m === "GET") return api.listAlbums(req, res);
   if (pathname === "/api/albums" && m === "POST") return api.createAlbum(req, res);
 
-  const a = /^\/api\/albums\/([^/]+)(?:\/(meta|password|files|thumbs)(?:\/([^/]+))?)?$/.exec(pathname);
+  const a = /^\/api\/albums\/([^/]+)(?:\/(meta|password|look|files|thumbs)(?:\/([^/]+))?)?$/.exec(pathname);
   if (!a) return fail(res, 404, "Not found.");
   let code, name;
   try { code = decodeURIComponent(a[1]); name = a[3] === undefined ? undefined : decodeURIComponent(a[3]); }
@@ -520,6 +539,7 @@ async function route(req, res, url) {
     if (m === "DELETE") return api.deleteAlbum(req, res, code);
   } else if (part === "meta" && name === undefined && m === "PUT") return api.saveMeta(req, res, code);
   else if (part === "password" && name === undefined && m === "PUT") return api.setPassword(req, res, code);
+  else if (part === "look" && name === undefined && m === "PUT") return api.setLook(req, res, code);
   else if (name !== undefined) {
     if (!okName(name)) return fail(res, 400, "That file name can't be used. Rename it without slashes and try again.");
     if (part === "files" && m === "PUT") return api.upload(req, res, code, name);

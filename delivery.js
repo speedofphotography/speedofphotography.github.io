@@ -5,6 +5,8 @@
 // they come near the screen either way. Downloads are always the untouched originals.
 // Galleries with a password ask for it first; the key the site gives back is added to every gallery address
 // (?k=) and remembered in this browser. Galleries without a password open straight away, as they always have.
+// The layout, the order of the photos and the background colour are chosen in SOP Studio; gallery-layouts.js
+// (loaded before this file) draws them. Galleries that never chose one look as they always have.
 
 (() => {
 const root = document.getElementById("delivery");
@@ -142,8 +144,24 @@ els.unlock.addEventListener("submit", async (e) => {
   }
 });
 
+let look = { layout: "masonry", bg: "" };
+const GL = window.GalleryLayouts;
+
+// The background colour chosen for this gallery, with text and panel colours to match. The header and footer
+// stay the site's own; the photo viewer stays dark.
+function applyColour(bg) {
+  const t = GL && GL.theme(bg);
+  if (!t) return;
+  const main = document.querySelector("main") || document.body;
+  for (const [k, v] of Object.entries(t.vars)) main.style.setProperty(k, v);
+  document.body.classList.add("delivery-themed");
+  document.body.classList.toggle("delivery-light", t.light);
+}
+
 function render(g) {
   files = g.files || [];
+  look = { layout: g.layout || "masonry", bg: g.bg || "" };
+  applyColour(look.bg);
   if (g.title) {
     els.title.textContent = g.title;
     document.title = `${g.title} | ${document.title.split("|").pop().trim()}`;
@@ -172,8 +190,10 @@ function render(g) {
   if ("serviceWorker" in navigator) navigator.serviceWorker.register("/g/sw.js", { scope: "/g/" }).catch(() => {});
 }
 
-// ---------- Grid: each photo at its own proportions, dropped into the shortest column ----------
+// ---------- Grid: the chosen layout (gallery-layouts.js) ----------
 const tiles = [];
+let lastWidth = 0;
+let viewH = window.innerHeight;
 function buildGrid() {
   files.forEach((f, i) => {
     const tile = document.createElement("figure");
@@ -232,8 +252,14 @@ function buildGrid() {
     tiles.push(tile);
     els.grid.append(tile);
   });
+  if (GL && GL.LAYOUTS.some((l) => l.id === look.layout && l.scroll)) els.grid.after(GL.arrows(els.grid));
   layout();
-  window.addEventListener("resize", queueLayout);
+  window.addEventListener("resize", () => {
+    // Phones change the window height as the address bar slides away; only a new width re-flows the photos.
+    if (window.innerWidth === lastWidth) return;
+    viewH = window.innerHeight;
+    queueLayout();
+  });
 }
 
 let layoutQueued = false;
@@ -243,23 +269,9 @@ function queueLayout() {
   requestAnimationFrame(() => { layoutQueued = false; layout(); });
 }
 function layout() {
-  const grid = els.grid;
-  if (!tiles.length || !grid.clientWidth) return;
-  const ROW = 2; // px per grid row (style.css)
-  const cs = getComputedStyle(grid);
-  const cols = cs.gridTemplateColumns.split(" ").length;
-  const gap = parseFloat(getComputedStyle(tiles[0]).marginBottom) || 0;
-  const colW = (grid.clientWidth - (parseFloat(cs.columnGap) || 0) * (cols - 1)) / cols;
-  const heights = new Array(cols).fill(0);
-  tiles.forEach((tile) => {
-    const h = Math.min(colW / tile.dataset.ratio, colW * 2);
-    const span = Math.ceil((h + gap) / ROW);
-    const c = heights.indexOf(Math.min(...heights));
-    tile.style.height = `${h}px`;
-    tile.style.gridColumn = String(c + 1);
-    tile.style.gridRow = `${heights[c] + 1} / span ${span}`;
-    heights[c] += span;
-  });
+  if (!tiles.length || !els.grid.clientWidth) return;
+  lastWidth = window.innerWidth;
+  GL.place(els.grid, tiles, look.layout, { viewH });
 }
 
 // ---------- Lightbox ----------

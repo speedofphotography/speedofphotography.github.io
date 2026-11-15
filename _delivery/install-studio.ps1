@@ -17,6 +17,8 @@ Get-ChildItem (Join-Path $here "studio") -File -Include *.mjs, *.js, *.html, *.c
   Copy-Item $_.FullName (Join-Path $dest $_.Name) -Force
 }
 Copy-Item (Join-Path $repo "_functions_lib\delivery.js") (Join-Path $dest "lib\delivery.js") -Force
+Copy-Item (Join-Path $repo "gallery-layouts.js") (Join-Path $dest "lib\gallery-layouts.js") -Force
+Copy-Item (Join-Path $repo "gallery-layouts.css") (Join-Path $dest "lib\gallery-layouts.css") -Force
 Copy-Item (Join-Path $repo "images\logo-small.png") (Join-Path $dest "logo.png") -Force
 Copy-Item (Join-Path $repo "favicon.ico") (Join-Path $dest "studio.ico") -Force
 [IO.File]::WriteAllText((Join-Path $dest "package.json"), "{ `"type`": `"module`" }`n")

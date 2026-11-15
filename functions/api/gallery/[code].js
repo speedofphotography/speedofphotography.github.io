@@ -3,7 +3,7 @@
 //                            to every gallery address (see Gallery passwords in _functions_lib/delivery.js).
 // Galleries without a password (every gallery made before passwords existed) work exactly as before.
 import {
-  CODE_RE, json, readMeta, isExpired, isClientFile, kindOf, allowed, passwordOk, makeKey,
+  CODE_RE, json, readMeta, isExpired, isClientFile, kindOf, allowed, passwordOk, makeKey, arrange,
 } from "../../../_functions_lib/delivery.js";
 
 // Wrong passwords per gallery, from anywhere, before it stops checking for an hour. (Each address is also
@@ -37,9 +37,9 @@ export async function onRequestGet({ request, params, env }) {
 
   if (!files.length && !meta.found) return json({ error: "not_found" }, 404);
 
-  files.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: "base" }));
-  const { found, lock, ...details } = meta;
-  return json({ code, ...details, files });
+  // Files come in the order arranged in Studio (name order if it was never arranged).
+  const { found, lock, order, ...details } = meta;
+  return json({ code, ...details, files: arrange(files, order) });
 }
 
 export async function onRequestPost({ request, params, env }) {
