@@ -58,10 +58,12 @@ const steps = (title, items) => `<table role="presentation" width="100%" cellpad
   </td></tr></table>`;
 
 // mail: { eyebrow, heading, message, button?, highlight?: [label, text], steps?: { title, items }, details?: { title, rows },
-//         cover?: url, signature? }. Returns { html, text }.
-// No hidden "preview text": text hidden in the page (or coloured like the background) is a classic spam sign, and
-// email apps show the first line of the message as the preview anyway.
+//         cover?: url, preview?, signature? }. Returns { html, text }.
+// "preview" is the line inbox lists show beside the subject: your own opening words ("Hi Alex, thanks for…"),
+// so it says nothing the email doesn't. It's hidden the ordinary way only; text coloured like the background is
+// a spam sign, so it never is.
 export function render(mail) {
+  const preview = String(mail.preview || "").replace(/\s+/g, " ").trim().slice(0, 140);
   const cover = mail.cover ? `<tr><td style="padding:0 0 30px;">
       <img src="${esc(safeUrl(mail.cover))}" width="600" alt="${esc(mail.coverAlt || "A photo from your shoot")}" style="display:block;width:100%;max-width:600px;height:auto;border:0;border-radius:8px;">
     </td></tr>` : "";
@@ -78,7 +80,7 @@ export function render(mail) {
 </style>
 </head>
 <body style="margin:0;padding:0;background:${C.bg};">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:${C.bg};">
+${preview ? `<div style="display:none;max-height:0;overflow:hidden;mso-hide:all;">${esc(preview)}</div>\n` : ""}<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:${C.bg};">
 <tr><td align="center" class="wrap" style="padding:36px 20px;">
   <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:600px;">
     <tr><td style="padding:0 0 30px;border-bottom:1px solid ${C.line};">

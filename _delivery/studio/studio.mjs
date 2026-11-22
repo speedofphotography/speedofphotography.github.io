@@ -722,6 +722,7 @@ async function composeMail(b, forPreview) {
     subject, eyebrow: text(b.eyebrow, 60), heading: text(b.heading, 120) || subject || "Speed Of Photography",
     message: typeof b.message === "string" ? b.message.slice(0, 10000) : "", signature: text(b.signature, 500),
   };
+  mail.preview = mail.message; // the inbox preview line: the start of your message, "Hi Alex, thanks for…"
   const inline = [];
 
   if (kind === "gallery") {
