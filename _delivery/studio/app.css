@@ -227,3 +227,23 @@ input[type="search"] { margin-bottom: 14px; }
   text-align: center; color: #fff; background: rgba(11, 11, 12, 0.75); border-radius: 10px; pointer-events: none; }
 .look-ext { position: absolute; inset: 0; display: grid; place-items: center; font: 700 1rem var(--display); color: var(--muted); pointer-events: none; }
 .look-stage .gl-arrows[hidden] { display: none; }
+
+/* Writing an email to a client (mail.js): the form beside a live preview of the real email. */
+.compose { display: grid; grid-template-columns: minmax(320px, 460px) minmax(0, 1fr); gap: 20px; align-items: start; }
+.compose-form h1 { margin-bottom: 18px; }
+.compose-preview { position: sticky; top: 16px; }
+.compose-preview .head { margin-bottom: 12px; }
+.compose-preview .head h2 { margin: 0; }
+.mail-frame { display: block; width: 100%; height: calc(100vh - 170px); min-height: 520px; margin: 0 auto; border: 1px solid var(--line);
+  border-radius: var(--radius); background: #0b0b0c; transition: width 0.25s ease; }
+.mail-frame.is-phone { width: 375px; max-width: 100%; }
+.to-list { display: grid; gap: 4px; margin-bottom: 8px; }
+.compose-form .check { display: flex; align-items: center; gap: 6px; }
+.compose-form .notice { padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); }
+.compose-form .notice p { margin: 0 0 10px; }
+ol.steps { margin: 0 0 14px; padding-left: 20px; line-height: 1.6; }
+@media (max-width: 900px) {
+  .compose { grid-template-columns: 1fr; }
+  .compose-preview { position: static; }
+  .mail-frame { height: 640px; }
+}

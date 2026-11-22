@@ -132,20 +132,17 @@ export async function unlinkGallery(code) {
   await save();
 }
 export const clientById = (id) => doc && clientOf(id);
+export const shootById = (id) => doc && shootOf(id);
+export const shootsOfClient = (id) => (doc ? shootsOf(id) : []);
+// A sent email goes into the client's notes (and the shoot's, if it was about one).
+export async function logEmail(clientId, shootId, text) {
+  await load();
+  doc.notes.push({ id: newId(), clientId, shootId: shootId || "", at: now(), kind: "email", text });
+  await save();
+}
 export const shootName = (s) => s.title || [clientOf(s.clientId)?.name, s.car].filter(Boolean).join(" · ") || "Untitled shoot";
 const igUrl = (handle) => `https://www.instagram.com/${encodeURIComponent(handle.replace(/^@/, ""))}/`;
 
-export function emailHref(c, s, link, expires) {
-  const to = emailsOf(c);
-  const first = to.length > 1 ? "everyone" : (c.name || "").split(" ")[0] || "there";
-  const what = s?.car ? `your ${s.car} shoot` : "your shoot";
-  const open = s?.galleryBy === "email"
-    ? (to.length > 1 ? "To open it, enter your email address (any of the ones this was sent to works).\n\n" : "To open it, enter your email address.\n\n")
-    : s?.galleryPass ? `Password: ${s.galleryPass}\n\n` : "";
-  const body = `Hi ${first},\n\nThe photos from ${what} are ready:\n${link}\n\n` + open +
-    (expires ? `You can view and download them until ${day(expires)}.\n\n` : "") + "Thanks again!\nSpeed Of Photography";
-  return `mailto:${to.map(encodeURIComponent).join(",")}?subject=${encodeURIComponent("Your photos are ready")}&body=${encodeURIComponent(body)}`;
-}
 export const canEmail = (c) => emailsOf(c).length > 0;
 
 // ---------- small pieces ----------
@@ -375,6 +372,7 @@ export async function clientScreen(id) {
     back("#/clients", "Clients"),
     h("div", { class: "head" }, h("h1", {}, c.name),
       h("div", { class: "row" }, h("a", { href: `#/clients/${c.id}/edit`, class: "btn btn-line" }, "Edit"),
+        canEmail(c) ? h("a", { href: `#/email?client=${c.id}`, class: "btn btn-line" }, "Send email") : null,
         h("a", { href: `#/shoots/new?client=${c.id}`, class: "btn btn-primary" }, "New shoot"))),
     h("p", { class: "contact" }, contact.length ? contact.flatMap((x, i) => (i ? [" · ", x] : [x])) : h("span", { class: "muted" }, "No contact details yet.")),
     h("p", { class: "muted" }, [carsOf(c).join(", "), c.source && `Found you through ${c.source}`, c.created && `Client since ${day(c.created)}`].filter(Boolean).join(" · ")),
@@ -499,6 +497,7 @@ export async function shootScreen(id, { createGallery, loadAlbums }) {
         s.status = next;
         if (await commit(`Marked ${label(STATUS, next).toLowerCase()}.`)) shootScreen(id, { createGallery, loadAlbums });
       } }, `Mark ${label(STATUS, next).toLowerCase()}`) : null,
+      c ? h("a", { href: `#/email?client=${c.id}&shoot=${s.id}`, class: "btn btn-line small" }, "Email client") : null,
       h("a", { href: `#/shoots/${s.id}/edit`, class: "btn btn-line small" }, "Edit"))),
     h("dl", { class: "facts" }, facts.flatMap(([k, x]) => [h("dt", {}, k), h("dd", {}, x)])),
     s.notes ? h("p", { class: "note-text client-notes" }, s.notes) : null,
@@ -522,7 +521,7 @@ function galleryPanel(s, c, { createGallery, loadAlbums, refresh }) {
     box.append(
       h("div", { class: "link-row" }, h("code", {}, link),
         h("button", { type: "button", class: "btn btn-primary small", onclick: () => copy(link) }, "Copy link"),
-        canEmail(c) ? h("a", { class: "btn btn-line small", href: emailHref(c, s, link) }, "Email link") : null,
+        c ? h("a", { class: "btn btn-line small", href: `#/email?client=${c.id}&shoot=${s.id}&kind=gallery` }, "Email link") : null,
         h("a", { href: `#/g/${s.gallery}`, class: "btn btn-line small" }, "Manage photos")),
       s.galleryBy === "email" ? h("p", { class: "muted" }, emailsOf(c).length > 1 ? "Opens with any of: " : "Opens with: ",
         h("code", {}, emailsOf(c).join(", ") || "the client's email")) : null,

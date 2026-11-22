@@ -22,6 +22,13 @@ slideshow, gallery wall), a background colour, and a preview where you drag phot
 It saves by itself into gallery.json as `layout`, `bg` and `order`. The preview and the client's page both use
 `gallery-layouts.js`/`.css` from the site, so they match. Galleries that never set these look as they always did.
 
+Studio also sends emails to clients from your own Gmail (Settings > Sending email: your address plus a Google
+app password, kept in the passphrase-locked vault, never in this repo). "Send email" on a client, "Email client" on
+a shoot and "Email link" on a gallery open a compose screen with a live preview: photos ready (button to the
+gallery, how to open it, a cover photo), shoot booked (date, time, place) or a plain message, all in the site's
+look (`_delivery/studio/mailer.mjs`). Sending uses SMTP to smtp.gmail.com (`smtp.mjs`), so copies land in Gmail's
+Sent folder, and each email sent is noted on the client in your records.
+
 ## How it fits together
 
 ```

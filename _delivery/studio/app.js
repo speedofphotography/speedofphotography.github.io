@@ -3,6 +3,7 @@
 import { app, info, hooks, h, show, toast, api, Locked, enc, fileUrl, size, day, isoIn, plural, copy, field, busyForm, back, go } from "./ui.js";
 import * as crm from "./crm.js";
 import { lookPanel } from "./look.js";
+import { composeScreen, mailSettings } from "./mail.js";
 
 const nav = document.querySelector(".bar-actions");
 let uploading = 0;
@@ -341,7 +342,7 @@ async function albumScreen(code) {
     h("div", { class: "link-row" },
       h("code", {}, a.link),
       h("button", { type: "button", class: "btn btn-primary small", onclick: () => copy(a.link) }, "Copy link"),
-      crm.canEmail(client) ? h("a", { class: "btn btn-line small", href: crm.emailHref(client, shoot, a.link, a.expires) }, "Email link") : null,
+      client ? h("a", { class: "btn btn-line small", href: `#/email?client=${client.id}&shoot=${shoot.id}&kind=gallery` }, "Email link") : null,
       h("a", { href: a.link, target: "_blank", rel: "noopener", class: "btn btn-line small" }, "Open")),
     drop, fileInput, progress,
     h("div", { class: "head files-head" }, h("h2", {}, "Files"), countLine, delBtn),
@@ -423,7 +424,7 @@ async function settingsScreen() {
   lengthSel.value = String(crm.galleryDays());
   const galleries = h("section", { class: "panel narrow" }, h("h2", {}, "Galleries"),
     field("New galleries stay open for", lengthSel, "You can still pick a different length for each gallery, and extend or shorten it later on its page."));
-  show(back("#/", "Today"), h("h1", {}, "Settings"), galleries, records, pass, keys);
+  show(back("#/", "Today"), h("h1", {}, "Settings"), galleries, await mailSettings(), records, pass, keys);
 }
 
 // ---------- routing ----------
@@ -484,6 +485,7 @@ async function route() {
     else if (path === "/galleries/new") await crm.galleryForm(q, { createGallery, lengthField });
     else if ((m = /^\/g\/([^/]+)$/.exec(path))) await albumScreen(decodeURIComponent(m[1]));
     else if (path === "/settings") await settingsScreen();
+    else if (path === "/email") await composeScreen(q);
     else go("#/");
   } catch (e) {
     if (!(e instanceof Locked)) show(h("p", { class: "panel narrow form-error" }, e.message), back("#/", "Today"));

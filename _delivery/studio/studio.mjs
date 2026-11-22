@@ -22,9 +22,11 @@ const repo = path.resolve(here, "..", "..");
 // Installed (install-studio.ps1), the app carries its own copy of the site's gallery rules and logo;
 // run from the website folder, it uses the originals.
 const installed = fs.existsSync(path.join(here, "lib", "delivery.js"));
-const { CODE_RE, META_FILE, typeOf, kindOf, isClientFile, readMeta, isExpired, makeLock, makeEmailLock, emailList, cleanPassword, cleanLook } =
+const { CODE_RE, META_FILE, typeOf, kindOf, isClientFile, readMeta, isExpired, makeLock, makeEmailLock, emailList, cleanPassword, cleanLook, arrange } =
   await import(installed ? "./lib/delivery.js" : "../../_functions_lib/delivery.js");
 const SITE = "https://speedofphotography.com";
+const smtp = await import("./smtp.mjs");
+const { render: renderMail } = await import("./mailer.mjs");
 const IDLE_MS = 30 * 60 * 1000;
 const MAX_FILE = 4.9 * 1024 ** 3; // R2's limit for a single upload is 5 GB
 const MAX_THUMB = 2 * 1024 * 1024;
@@ -49,6 +51,7 @@ function connect(secrets) {
   state.crm = crm.createStore(state.r2, Buffer.from(secrets.dataKey, "base64"));
   state.inboxKey = secrets.inboxKey;
   state.bucket = secrets.bucket;
+  state.mail = secrets.mail || null; // Gmail address and app password, if set up (Settings)
   publishInboxKey(state.r2, secrets.inboxKey);
 }
 
@@ -112,6 +115,15 @@ const SECURITY = {
   "cross-origin-resource-policy": "same-origin",
   "cache-control": "no-store",
 };
+// An email preview, shown in a frame on Studio's own page: email styles are written on each element, so they're
+// allowed here (and only here). No scripts.
+const PREVIEW_SECURITY = {
+  ...SECURITY,
+  "content-security-policy": "default-src 'none'; style-src 'unsafe-inline' https://fonts.googleapis.com; " +
+    "font-src https://fonts.gstatic.com; img-src 'self' https://speedofphotography.com; frame-ancestors 'self'; form-action 'none'",
+  "x-frame-options": "SAMEORIGIN",
+  "content-type": "text/html; charset=utf-8",
+};
 
 function send(res, status, body, headers = {}) {
   const buf = typeof body === "string" || Buffer.isBuffer(body) ? body : JSON.stringify(body);
@@ -147,6 +159,7 @@ const STATIC = {
   "/ui.js": ["ui.js", "text/javascript; charset=utf-8"],
   "/crm.js": ["crm.js", "text/javascript; charset=utf-8"],
   "/look.js": ["look.js", "text/javascript; charset=utf-8"],
+  "/mail.js": ["mail.js", "text/javascript; charset=utf-8"],
   // The website's own layout code, so the preview here matches the client's page exactly.
   "/gallery-layouts.js": [path.join(installed ? path.join(here, "lib") : repo, "gallery-layouts.js"), "text/javascript; charset=utf-8"],
   "/gallery-layouts.css": [path.join(installed ? path.join(here, "lib") : repo, "gallery-layouts.css"), "text/css; charset=utf-8"],
@@ -281,7 +294,7 @@ const api = {
     let restored = false;
     try {
       await test.list({ max: 1 });
-      if (old) fillKeys(secrets, old);
+      if (old) { fillKeys(secrets, old); if (old.mail) secrets.mail = old.mail; }
       else {
         // Client records already in R2 from an earlier setup? Same passphrase unlocks them again.
         const sealed = await test.getText(crm.REMOTE_KEY);
@@ -459,6 +472,69 @@ const api = {
     send(res, 200, { locked: !!meta.access, lockedBy: lockedBy(meta.access), changed: true });
   },
 
+  // ----- email -----
+  async mailState(req, res) {
+    send(res, 200, { ready: !!state.mail, address: state.mail?.address || "", fromName: state.mail?.fromName || "Speed Of Photography" });
+  },
+
+  // { address, appPassword, fromName, passphrase }: checks Gmail accepts them, then keeps them in the vault.
+  // { remove: true, passphrase } forgets them.
+  async mailSettings(req, res) {
+    const b = await readJson(req);
+    const secrets = typeof b.passphrase === "string" && b.passphrase ? await vault.open(b.passphrase) : null;
+    if (!secrets) return fail(res, 401, "That passphrase isn't right.");
+    if (b.remove === true) {
+      delete secrets.mail;
+    } else {
+      const mail = {
+        address: text(b.address, 200).toLowerCase(),
+        appPassword: text(b.appPassword, 100).replace(/\s+/g, "") || state.mail?.appPassword || "",
+        fromName: text(b.fromName, 80) || "Speed Of Photography",
+      };
+      if (!smtp.EMAIL_RE.test(mail.address)) return fail(res, 400, "Type the Gmail address you send from.");
+      if (!/^[A-Za-z0-9]{8,64}$/.test(mail.appPassword)) return fail(res, 400, "Paste the 16-letter app password Google showed you.");
+      try { await smtp.checkLogin(mail); }
+      catch (e) { return fail(res, e.status || 502, e.status ? e.message : `Couldn't reach Gmail: ${e.message}`); }
+      secrets.mail = mail;
+    }
+    await vault.save(b.passphrase, secrets);
+    state.mail = secrets.mail || null;
+    send(res, 200, { ready: !!state.mail, address: state.mail?.address || "" });
+  },
+
+  async mailPreview(req, res) {
+    const { html } = await composeMail(await readJson(req), true);
+    const id = crypto.randomBytes(12).toString("hex");
+    previews.set(id, html);
+    while (previews.size > 20) previews.delete(previews.keys().next().value);
+    send(res, 200, { url: `/api/mail/preview/${id}` });
+  },
+  async mailPreviewPage(req, res, id) {
+    const html = previews.get(id);
+    if (!html) return send(res, 404, "Gone", { "content-type": "text/plain" });
+    res.writeHead(200, PREVIEW_SECURITY);
+    res.end(html);
+  },
+
+  async mailSend(req, res) {
+    if (!state.mail) return fail(res, 409, "Set up sending in Settings first.");
+    const b = await readJson(req);
+    const mail = await composeMail(b, false);
+    const to = await smtp.send(state.mail, { to: mail.to, subject: mail.subject, html: mail.html, text: mail.text, inline: mail.inline });
+    send(res, 200, { to, subject: mail.subject });
+  },
+
+  async mailTest(req, res) {
+    if (!state.mail) return fail(res, 409, "Set up sending in Settings first.");
+    const { html, text: plain } = renderMail({
+      subject: "Test email from SOP Studio", eyebrow: "SOP Studio", heading: "Sending works",
+      message: "This is a test from SOP Studio. Emails to clients look like this, in the website's colours.\n\nReplies come back to this inbox.",
+      highlight: ["Sent from", state.mail.address], button: { label: "Visit the website", url: SITE + "/" },
+    });
+    await smtp.send(state.mail, { to: [state.mail.address], subject: "Test email from SOP Studio", html, text: plain });
+    send(res, 200, { to: state.mail.address });
+  },
+
   async deleteAlbum(req, res, code) {
     const { keys } = await filesOf(code);
     await eachLimit(keys, 8, (k) => state.r2.del(k));
@@ -538,6 +614,13 @@ async function route(req, res, url) {
   if (pathname === "/api/inbox/done" && m === "POST") return api.inboxDone(req, res);
   if (pathname === "/api/crm" && m === "GET") return api.getCrm(req, res);
   if (pathname === "/api/crm" && m === "PUT") return api.saveCrm(req, res);
+  if (pathname === "/api/mail" && m === "GET") return api.mailState(req, res);
+  if (pathname === "/api/mail/settings" && m === "PUT") return api.mailSettings(req, res);
+  if (pathname === "/api/mail/preview" && m === "POST") return api.mailPreview(req, res);
+  if (pathname === "/api/mail/send" && m === "POST") return api.mailSend(req, res);
+  if (pathname === "/api/mail/test" && m === "POST") return api.mailTest(req, res);
+  const pv = /^\/api\/mail\/preview\/([0-9a-f]{24})$/.exec(pathname);
+  if (pv && m === "GET") return api.mailPreviewPage(req, res, pv[1]);
   if (pathname === "/api/albums" && m === "GET") return api.listAlbums(req, res);
   if (pathname === "/api/albums" && m === "POST") return api.createAlbum(req, res);
 
@@ -617,3 +700,59 @@ function listen(port, tries = 10) {
   });
 }
 listen(Number(process.env.PORT || 4417));
+
+// ---------- emails to clients ----------
+const previews = new Map();
+const KINDS = ["gallery", "booking", "message"];
+const longDay = (iso) => (/^\d{4}-\d{2}-\d{2}$/.test(iso || "")
+  ? new Date(`${iso}T12:00`).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" }) : "");
+
+// A draft from the compose screen → the finished email. For a preview, the cover photo comes from this app;
+// for sending, it travels inside the email.
+async function composeMail(b, forPreview) {
+  const doc = await state.crm.load();
+  const client = doc.clients.find((c) => c.id === b.clientId) || null;
+  const shoot = doc.shoots.find((s) => s.id === b.shootId && (!client || s.clientId === client.id)) || null;
+  const kind = KINDS.includes(b.kind) ? b.kind : "message";
+  const to = (Array.isArray(b.to) ? b.to : []).map((x) => text(x, 200).toLowerCase()).filter(Boolean).slice(0, 20);
+  if (!forPreview && !to.length) throw Object.assign(new Error("Pick who it goes to."), { status: 400 });
+  const subject = text(b.subject, 200);
+  if (!forPreview && !subject) throw Object.assign(new Error("Give the email a subject."), { status: 400 });
+  const mail = {
+    subject, eyebrow: text(b.eyebrow, 60), heading: text(b.heading, 120) || subject || "Speed Of Photography",
+    message: typeof b.message === "string" ? b.message.slice(0, 10000) : "", signature: text(b.signature, 500),
+    preheader: text(b.message, 300).replace(/\s+/g, " ").slice(0, 120),
+  };
+  const inline = [];
+
+  if (kind === "gallery") {
+    const code = shoot?.gallery;
+    if (!code) throw Object.assign(new Error("This shoot has no gallery yet."), { status: 400 });
+    const [meta, { files }] = await Promise.all([metaOf(code), filesOf(code)]);
+    mail.button = { label: text(b.buttonLabel, 40) || "View your photos", url: linkFor(code) };
+    if (meta.lock?.email) mail.highlight = ["To open it", "Enter your email address"];
+    else if (meta.lock && shoot.galleryPass) mail.highlight = ["Password", shoot.galleryPass];
+    mail.details = { title: "Your gallery", rows: [
+      ["Gallery", meta.title], ["Shot", longDay(meta.date)], ["Available until", meta.expires ? longDay(meta.expires) : "No end date"],
+      ["Link", linkFor(code)],
+    ].filter(([, v]) => v) };
+    if (b.cover !== false) {
+      const first = arrange(files, meta.order).find((f) => f.thumb);
+      if (first) {
+        if (forPreview) mail.cover = `/api/albums/${encodeURIComponent(code)}/files/${encodeURIComponent(first.name)}?thumb=1`;
+        else {
+          const data = await state.r2.getBuffer(`${code}/${THUMBS}/${first.name}.jpg`);
+          if (data) { inline.push({ cid: "cover@sop", type: "image/jpeg", name: "cover.jpg", data }); mail.cover = "cid:cover@sop"; }
+        }
+      }
+    }
+  } else if (kind === "booking" && shoot) {
+    if (shoot.date) mail.highlight = ["Shoot day", `${longDay(shoot.date)}${shoot.time ? ` · ${shoot.time}` : ""}`];
+    // The date and time are in the blue box already.
+    mail.details = { title: "Your shoot", rows: [
+      ...(shoot.date ? [] : [["Time", shoot.time]]), ["Location", shoot.location], ["Car", shoot.car], ["Package", shoot.package],
+    ].filter(([, v]) => v) };
+  }
+  const { html, text: plain } = renderMail(mail);
+  return { to, subject, html, text: plain, inline, client };
+}
