@@ -19,14 +19,39 @@ const word = (s) => (/^[\x20-\x7e]*$/.test(s) ? s : `=?UTF-8?B?${Buffer.from(s, 
 const b64lines = (buf) => buf.toString("base64").replace(/.{1,76}/g, "$&\r\n");
 const boundary = () => `=_sop_${crypto.randomBytes(12).toString("hex")}`;
 
+// Text the way ordinary email apps send it (quoted-printable, RFC 2045): plain letters stay as they are, anything
+// else becomes =XX, and long lines are folded with a "=" at the end. Spam filters distrust text sent as base64.
+export function qp(str) {
+  const out = [];
+  for (const line of String(str).replace(/\r\n?/g, "\n").split("\n")) {
+    const bytes = Buffer.from(line, "utf8");
+    let enc = "";
+    for (let i = 0; i < bytes.length; i++) {
+      const b = bytes[i];
+      const keep = (b >= 33 && b <= 126 && b !== 61) || ((b === 32 || b === 9) && i < bytes.length - 1);
+      enc += keep ? String.fromCharCode(b) : `=${b.toString(16).toUpperCase().padStart(2, "0")}`;
+    }
+    while (enc.length > 76) {
+      // Fold at 75 characters plus "=", never through the middle of an =XX.
+      let cut = 75;
+      if (enc[cut - 1] === "=") cut -= 1;
+      else if (enc[cut - 2] === "=") cut -= 2;
+      out.push(`${enc.slice(0, cut)}=`);
+      enc = enc.slice(cut);
+    }
+    out.push(enc);
+  }
+  return out.join("\r\n");
+}
+
 // The whole message as text, ready to send. inline: [{ cid, type, name, data: Buffer }] pictures the HTML shows
 // with src="cid:...".
 export function buildMessage({ from, fromName, to, subject, html, text, inline = [] }) {
   const alt = boundary();
   const altPart = [
     `Content-Type: multipart/alternative; boundary="${alt}"`, "",
-    `--${alt}`, "Content-Type: text/plain; charset=utf-8", "Content-Transfer-Encoding: base64", "", b64lines(Buffer.from(text, "utf8")),
-    `--${alt}`, "Content-Type: text/html; charset=utf-8", "Content-Transfer-Encoding: base64", "", b64lines(Buffer.from(html, "utf8")),
+    `--${alt}`, "Content-Type: text/plain; charset=utf-8", "Content-Transfer-Encoding: quoted-printable", "", qp(text),
+    `--${alt}`, "Content-Type: text/html; charset=utf-8", "Content-Transfer-Encoding: quoted-printable", "", qp(html),
     `--${alt}--`, "",
   ].join("\r\n");
   let body = altPart;

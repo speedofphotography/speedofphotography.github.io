@@ -721,7 +721,6 @@ async function composeMail(b, forPreview) {
   const mail = {
     subject, eyebrow: text(b.eyebrow, 60), heading: text(b.heading, 120) || subject || "Speed Of Photography",
     message: typeof b.message === "string" ? b.message.slice(0, 10000) : "", signature: text(b.signature, 500),
-    preheader: text(b.message, 300).replace(/\s+/g, " ").slice(0, 120),
   };
   const inline = [];
 
