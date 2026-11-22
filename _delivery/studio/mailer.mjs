@@ -32,7 +32,7 @@ const details = (title, rows) => `<table role="presentation" width="100%" cellpa
     ${title ? `<div style="font-family:${DISPLAY};font-weight:700;font-size:18px;letter-spacing:1px;text-transform:uppercase;color:${C.text};margin:0 0 14px;">${esc(title)}</div>` : ""}
     ${rows.map(([k, v]) => `<div style="margin:0 0 14px;">
       <div style="font-family:${DISPLAY};font-weight:500;font-size:12px;letter-spacing:2.5px;text-transform:uppercase;color:${C.muted};margin:0 0 3px;">${esc(k)}</div>
-      <div style="font-family:${BODY};font-size:16px;line-height:1.45;color:${C.text};">${esc(v).replace(/\n/g, "<br>")}</div>
+      <div style="font-family:${BODY};font-size:16px;line-height:1.45;color:${C.text};word-break:break-word;overflow-wrap:anywhere;">${esc(v).replace(/\n/g, "<br>")}</div>
     </div>`).join("")}
   </td></tr></table>`;
 
