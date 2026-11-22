@@ -10,9 +10,10 @@ const TYPES = [["gallery", "Photos are ready (gallery link)"], ["thanks", "Thank
 export const DEFAULTS = {
   thanks: {
     subject: "Thanks for the shoot!", eyebrow: "Thank you", heading: "Thanks for the shoot",
-    message: "Hi {name},\n\nThanks for a great shoot with your {car}. I had a lot of fun with it.",
+    // Your own line about the shoot, written each time (it goes under "Hi {name},"). Step 1 is picked when sending.
+    message: "",
     stepsTitle: "Next steps",
-    steps: "I'm editing your photos now.\nYou'll get an email with your gallery link as soon as they're ready.\nOpen the gallery with your email address, then view and download everything.",
+    steps: "You'll get an email with your gallery link as soon as they're ready.\nOpen the gallery with your email address, then view and download everything.",
     sign: "Thanks,\nJaxon",
   },
   gallery: {
@@ -25,6 +26,18 @@ export const DEFAULTS = {
 const FIELDS = ["subject", "eyebrow", "heading", "message", "stepsTitle", "steps", "sign"];
 const shortDay = (iso) => (iso ? new Date(`${iso}T12:00`).toLocaleDateString("en-US", { month: "long", day: "numeric" }) : "");
 
+// Step 1 of the thank-you email, picked from a list when you send it. The 7-day one names the date a week from
+// the day it's sent (worked out when you press Send).
+const inAWeek = () => {
+  const d = new Date();
+  d.setDate(d.getDate() + 7);
+  return d.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
+};
+const STEP1 = {
+  week: () => `I'm currently working on editing your photos, they will be done within the next 7 days! Expect them by ${inAWeek()}.`,
+  fast: () => "I'm currently working on editing your photos, they should be done in the next 24-48 hours!",
+};
+
 // The starting words for each kind of email. Everything can be changed before sending.
 function template(kind, c, s, from) {
   const many = crm.emailsOf(c).length > 1;
@@ -35,7 +48,7 @@ function template(kind, c, s, from) {
   if (DEFAULTS[kind]) {
     const t = { ...DEFAULTS[kind], ...(crm.savedTemplate(kind) || {}) };
     const fill = (v) => String(v || "").replace(/\{name\}/g, name).replace(/\{car\}/g, s?.car || "car").replace(/\{from\}/g, from || "Speed Of Photography");
-    return Object.fromEntries(FIELDS.map((k) => [k, fill(t[k])]));
+    return { ...Object.fromEntries(FIELDS.map((k) => [k, fill(t[k])])), greeting: hi };
   }
   if (kind === "booking") return {
     subject: `You're booked${s?.date ? ` for ${shortDay(s.date)}` : ""}`, eyebrow: "Shoot confirmed", heading: "You're booked", sign,
@@ -76,7 +89,23 @@ export async function composeScreen(q) {
   const galleryBits = h("div", {}, field("Button", buttonLabel), h("label", { class: "check" }, cover, " Show a photo from the gallery at the top"));
   const stepsTitle = h("input", { maxlength: "60" });
   const steps = h("textarea", { rows: "5", maxlength: "5000" });
-  const stepsBits = h("div", {}, field("Steps heading", stepsTitle), field("Next steps", steps, "One step per line. Each gets a blue number."));
+  // The thank-you email: your own line about the shoot, then step 1 from the list, then the rest of the steps.
+  const line = h("textarea", { rows: "3", maxlength: "5000", placeholder: "Write your line about the shoot here." });
+  const step1 = h("select", { "aria-label": "Step 1" });
+  const fillStep1 = () => {
+    const keep = step1.value || "week";
+    step1.replaceChildren(h("option", { value: "week" }, `Done within 7 days (by ${inAWeek()})`), h("option", { value: "fast" }, "Done in the next 24-48 hours"));
+    step1.value = keep;
+  };
+  fillStep1();
+  let greeting = "";
+  const greetNote = h("small", {});
+  const thanksBits = h("div", {},
+    h("label", { class: "field" }, h("span", {}, "Your message"), line, greetNote),
+    field("Step 1", step1, "Starts \"I'm currently working on editing your photos\". The 7-day one gives the date a week from when you send it."),
+    field("Steps heading", stepsTitle),
+    field("More steps", steps, "Step 2 onwards, one per line. Each gets a blue number."));
+  const messageField = field("Message", message, "A blank line starts a new paragraph.");
 
   const shoot = () => crm.shootById(shootSel.value);
   const wording = h("p", { class: "muted small" }, "Change the starting wording of this email in ", h("a", { href: "#/settings" }, "Settings"), ".");
@@ -95,8 +124,15 @@ export async function composeScreen(q) {
     sign.value = t.sign;
     stepsTitle.value = t.stepsTitle || "";
     steps.value = t.steps || "";
+    const thanks = typeSel.value === "thanks";
+    if (thanks) {
+      greeting = t.greeting;
+      line.value = t.message;
+      greetNote.textContent = `Goes under "${greeting}". Write whatever you like about the shoot.`;
+    }
     galleryBits.hidden = typeSel.value !== "gallery";
-    stepsBits.hidden = typeSel.value !== "thanks";
+    thanksBits.hidden = !thanks;
+    messageField.hidden = thanks;
     wording.hidden = !DEFAULTS[typeSel.value];
   }
   const s0 = shoot();
@@ -105,11 +141,15 @@ export async function composeScreen(q) {
   shootSel.addEventListener("change", () => { fillTypes(typeSel.value); fillText(); refresh(); });
   typeSel.addEventListener("change", () => { fillText(); refresh(); });
 
-  const draft = () => ({
-    clientId: c.id, shootId: shootSel.value, kind: typeSel.value, to: recipients(), subject: subject.value, eyebrow: eyebrow.value,
-    heading: heading.value, message: message.value, signature: sign.value, buttonLabel: buttonLabel.value, cover: cover.checked,
-    stepsTitle: stepsTitle.value, steps: steps.value,
-  });
+  const draft = () => {
+    const thanks = typeSel.value === "thanks";
+    return {
+      clientId: c.id, shootId: shootSel.value, kind: typeSel.value, to: recipients(), subject: subject.value, eyebrow: eyebrow.value,
+      heading: heading.value, signature: sign.value, buttonLabel: buttonLabel.value, cover: cover.checked, stepsTitle: stepsTitle.value,
+      message: thanks ? `${greeting}\n\n${line.value.trim()}` : message.value,
+      steps: thanks ? `${(STEP1[step1.value] || STEP1.week)()}\n${steps.value}` : steps.value,
+    };
+  };
 
   // ----- preview -----
   const frame = h("iframe", { class: "mail-frame", title: "Email preview", sandbox: "allow-same-origin allow-popups allow-popups-to-escape-sandbox" });
@@ -125,8 +165,9 @@ export async function composeScreen(q) {
       } catch (e) { if (!(e instanceof Locked) && mine === seq) { previewErr.textContent = e.message; previewErr.hidden = false; } }
     }, 350);
   }
-  for (const el of [subject, eyebrow, heading, message, sign, buttonLabel, stepsTitle, steps]) el.addEventListener("input", refresh);
+  for (const el of [subject, eyebrow, heading, message, sign, buttonLabel, stepsTitle, steps, line]) el.addEventListener("input", refresh);
   cover.addEventListener("change", refresh);
+  step1.addEventListener("change", refresh);
   const widthBtns = [["Computer", ""], ["Phone", "is-phone"]].map(([label, cls], i) =>
     h("button", { type: "button", class: "btn btn-line small", "aria-pressed": String(i === 0), onclick: (e) => {
       widthBtns.forEach((b) => b.setAttribute("aria-pressed", String(b === e.currentTarget)));
@@ -145,8 +186,8 @@ export async function composeScreen(q) {
     field("Kind of email", typeSel),
     field("Subject", subject),
     h("div", { class: "pair" }, field("Small heading", eyebrow, "The blue line at the top."), field("Big heading", heading)),
-    field("Message", message, "A blank line starts a new paragraph."),
-    stepsBits,
+    messageField,
+    thanksBits,
     galleryBits,
     field("Sign-off", sign),
     wording,
@@ -165,6 +206,7 @@ export async function composeScreen(q) {
     err.hidden = true;
     const d = draft();
     if (!d.to.length) { err.textContent = "Pick who it goes to."; err.hidden = false; return; }
+    if (d.kind === "thanks" && !line.value.trim()) { err.textContent = "Write your line about the shoot first."; err.hidden = false; line.focus(); return; }
     if (!confirm(`Send "${d.subject}" to ${d.to.join(", ")}?`)) return;
     sendBtn.disabled = true;
     sendBtn.textContent = "Sending…";
@@ -274,8 +316,11 @@ export function wordingSettings() {
     panel.append(h("details", { class: "wording", open: kind === "thanks" }, h("summary", {}, title),
       field("Subject", inputs.subject),
       h("div", { class: "pair" }, field("Small heading", inputs.eyebrow), field("Big heading", inputs.heading)),
-      field("Message", inputs.message, "A blank line starts a new paragraph."),
-      kind === "thanks" ? [field("Steps heading", inputs.stepsTitle), field("Next steps", inputs.steps, "One step per line.")] : null,
+      kind === "thanks"
+        ? [field("Starting text for your line", inputs.message, "Leave it empty to write a fresh line each time (it goes under \"Hi {name},\")."),
+          field("Steps heading", inputs.stepsTitle),
+          field("Steps after step 1", inputs.steps, "One per line. Step 1 is picked when you send: done in 7 days (with the date), or in 24-48 hours.")]
+        : field("Message", inputs.message, "A blank line starts a new paragraph."),
       field("Sign-off", inputs.sign),
       h("div", { class: "row" }, save, reset)));
   }
