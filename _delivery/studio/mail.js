@@ -13,13 +13,13 @@ export const DEFAULTS = {
     message: "Hi {name},\n\nThanks for a great shoot with your {car}. I had a lot of fun with it.",
     stepsTitle: "Next steps",
     steps: "I'm editing your photos now.\nYou'll get an email with your gallery link as soon as they're ready.\nOpen the gallery with your email address, then view and download everything.",
-    sign: "Thanks,\n{from}",
+    sign: "Thanks,\nJaxon",
   },
   gallery: {
     subject: "Your photos are ready", eyebrow: "Your gallery", heading: "Your photos are ready",
     message: "Hi {name},\n\nThanks again for the shoot with your {car}. Your edited photos are ready to view and download.\n\n" +
       "Open your gallery with the button below. You can save single photos or download everything at once.",
-    stepsTitle: "", steps: "", sign: "Thanks,\n{from}",
+    stepsTitle: "", steps: "", sign: "Thanks,\nJaxon",
   },
 };
 const FIELDS = ["subject", "eyebrow", "heading", "message", "stepsTitle", "steps", "sign"];
@@ -31,7 +31,7 @@ function template(kind, c, s, from) {
   const name = many ? "everyone" : (c?.name || "").split(" ")[0] || "there";
   const hi = `Hi ${name},`;
   const car = s?.car ? ` with your ${s.car}` : "";
-  const sign = `Thanks,\n${from || "Speed Of Photography"}`;
+  const sign = "Thanks,\nJaxon";
   if (DEFAULTS[kind]) {
     const t = { ...DEFAULTS[kind], ...(crm.savedTemplate(kind) || {}) };
     const fill = (v) => String(v || "").replace(/\{name\}/g, name).replace(/\{car\}/g, s?.car || "car").replace(/\{from\}/g, from || "Speed Of Photography");
