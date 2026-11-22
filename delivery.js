@@ -5,6 +5,7 @@
 // they come near the screen either way. Downloads are always the untouched originals.
 // Galleries with a password ask for it first; the key the site gives back is added to every gallery address
 // (?k=) and remembered in this browser. Galleries without a password open straight away, as they always have.
+// Most galleries open with the client's email instead of a password (any of a group's emails works).
 // The layout, the order of the photos and the background colour are chosen in SOP Studio; gallery-layouts.js
 // (loaded before this file) draws them. Galleries that never chose one look as they always have.
 
@@ -15,7 +16,7 @@ const $ = (name) => document.querySelector(`[data-d="${name}"]`);
 const els = {
   title: $("title"), meta: $("meta"), message: $("message"), open: $("open"), actions: $("actions"),
   zip: $("zip"), zipStatus: $("zip-status"), state: $("state"), grid: $("grid"), help: $("help"), lb: $("lightbox"),
-  unlock: $("unlock"), unlockError: $("unlock-error"), stage: $("stage"),
+  unlock: $("unlock"), unlockError: $("unlock-error"), unlockLabel: $("unlock-label"), stage: $("stage"),
 };
 
 const code = (location.pathname.match(/^\/g\/([^/]+)/) || [])[1] || "";
@@ -88,10 +89,14 @@ if (!code) {
 // ---------- Load the gallery ----------
 let files = [];
 const locked = new Error("password");
+let ask = "password"; // or "email": what this gallery opens with
 function load() {
 fetch(`/api/gallery/${enc(code)}${query()}`, { cache: "no-store" })
   .then(async (res) => {
-    if (res.status === 401) throw locked;
+    if (res.status === 401) {
+      ask = (await res.json().catch(() => ({}))).ask === "email" ? "email" : "password";
+      throw locked;
+    }
     if (res.status === 404) throw new Error("We couldn't find that gallery. Check the link, or email me and I'll resend it.");
     if (res.status === 410) throw new Error("This gallery has expired. Email me if you need the photos again.");
     if (!res.ok) throw new Error("The gallery couldn't load right now. Please try again in a minute.");
@@ -112,9 +117,16 @@ function askPassword() {
   remember(""); // a saved key that no longer works (e.g. the password was changed)
   els.title.textContent = "Your photos";
   setState("");
+  const input = els.unlock.password;
+  if (ask === "email") {
+    els.unlockLabel.textContent = "Enter your email address to open your photos (the one you booked with).";
+    input.type = "email";
+    input.autocomplete = "email";
+    input.inputMode = "email";
+  }
   els.unlock.hidden = false;
   els.help.hidden = false;
-  els.unlock.password.focus();
+  input.focus();
 }
 els.unlock.addEventListener("submit", async (e) => {
   e.preventDefault();
@@ -133,7 +145,10 @@ els.unlock.addEventListener("submit", async (e) => {
       els.unlock.reset();
       setState("Loading your photos…");
       load();
-    } else if (res.status === 401) say("That password isn't right. Check the message I sent with your link.");
+    } else if (res.status === 401) {
+      say(ask === "email" ? "That email isn't on the list for this gallery. Try the one you booked with, or email me."
+        : "That password isn't right. Check the message I sent with your link.");
+    }
     else if (res.status === 429) say("Too many wrong tries. Please wait an hour, or email me.");
     else if (res.status === 410) { els.unlock.hidden = true; load(); }
     else say("Couldn't check the password right now. Please try again in a minute.");

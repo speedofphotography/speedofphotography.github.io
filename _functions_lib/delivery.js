@@ -131,6 +131,8 @@ export function isExpired(meta) {
 
 // ---------- Gallery passwords ----------
 // SOP Studio saves a password as { iter, salt, hash } (PBKDF2-SHA256) in gallery.json, never the password itself.
+// A gallery opened by email is { iter, salt, hash, more, email: true }: one hash per email (all with the same salt,
+// so checking a try takes one PBKDF2 whatever the number of emails), and any of them lets the client in.
 // After the right password, the page gets a key ("k") that it adds to every address in the gallery. The key is
 // signed with the stored hash, so changing the password (new salt and hash) makes every old key stop working.
 // Studio (Node) and the website (Cloudflare) both use these same functions.
@@ -144,14 +146,31 @@ const fromB64url = (s) => fromB64(s.replace(/-/g, "+").replace(/_/g, "/") + "===
 // Spaces a phone keyboard adds at the ends don't count, and accented letters compare the same however typed.
 export const cleanPassword = (p) => (typeof p === "string" ? p.normalize("NFC").trim() : "");
 
+// Galleries can also be opened with an email: the one the client booked with, or any of a group's. Capital letters
+// don't matter there. A list of emails is typed one per line (commas and spaces work too).
+export const MAX_EMAILS = 50;
+export const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+export const cleanEmail = (e) => cleanPassword(e).toLowerCase();
+export function emailList(v) {
+  const out = [];
+  for (const e of (Array.isArray(v) ? v : String(v || "").split(/[\s,;]+/)).map(cleanEmail)) {
+    if (EMAIL_RE.test(e) && e.length <= 200 && !out.includes(e)) out.push(e);
+  }
+  return out.slice(0, MAX_EMAILS);
+}
+
 function lockOf(a) {
   if (!a || typeof a !== "object") return null;
   const iter = Number(a.iter);
   if (!Number.isInteger(iter) || iter < 1000 || iter > PBKDF2_ITER) return null;
+  const more = Array.isArray(a.more) ? a.more : [];
+  if (more.length > MAX_EMAILS) return null;
   try {
-    if (fromB64(a.salt).length < 16 || fromB64(a.hash).length !== 32) return null;
+    if (fromB64(a.salt).length < 16 || [a.hash, ...more].some((x) => typeof x !== "string" || fromB64(x).length !== 32)) return null;
   } catch { return null; }
-  return { iter, salt: a.salt, hash: a.hash };
+  const lock = { iter, salt: a.salt, hash: a.hash };
+  if (a.email === true) Object.assign(lock, { more, email: true });
+  return lock;
 }
 
 async function pbkdf2(password, salt, iter) {
@@ -164,13 +183,29 @@ export async function makeLock(password) {
   return { iter: PBKDF2_ITER, salt: toB64(salt), hash: toB64(await pbkdf2(password, salt, PBKDF2_ITER)) };
 }
 
+// A lock that opens with any of these emails. Pass the old email lock as "keep" to reuse its salt: then a client
+// whose email is still first on the list stays let in on their browser when you add or remove other emails.
+export async function makeEmailLock(emails, keep) {
+  const list = emailList(emails);
+  if (!list.length) return null;
+  const salt = keep?.email ? fromB64(keep.salt) : crypto.getRandomValues(new Uint8Array(16));
+  const hashes = [];
+  for (const e of list) hashes.push(toB64(await pbkdf2(e, salt, PBKDF2_ITER)));
+  return { iter: PBKDF2_ITER, salt: toB64(salt), hash: hashes[0], more: hashes.slice(1), email: true };
+}
+
 export async function passwordOk(lock, password) {
-  if (!lock || !cleanPassword(password)) return false;
-  const got = await pbkdf2(password, fromB64(lock.salt), lock.iter);
-  const want = fromB64(lock.hash);
-  let diff = got.length ^ want.length;
-  for (let i = 0; i < want.length; i++) diff |= got[i] ^ want[i];
-  return diff === 0;
+  const tried = lock?.email ? cleanEmail(password) : cleanPassword(password);
+  if (!lock || !tried) return false;
+  const got = await pbkdf2(tried, fromB64(lock.salt), lock.iter);
+  let match = 0;
+  for (const h of [lock.hash, ...(lock.more || [])]) { // every one is compared, so timing says nothing
+    const want = fromB64(h);
+    let diff = got.length ^ want.length;
+    for (let i = 0; i < want.length; i++) diff |= got[i] ^ want[i];
+    match |= diff === 0 ? 1 : 0;
+  }
+  return match === 1;
 }
 
 const signer = (lock) => crypto.subtle.importKey("raw", fromB64(lock.hash), { name: "HMAC", hash: "SHA-256" }, false, ["sign", "verify"]);

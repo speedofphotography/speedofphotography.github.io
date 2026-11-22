@@ -86,7 +86,7 @@ async function albumsScreen() {
         h("h2", {}, h("a", { href: `#/g/${a.code}` }, a.title || a.client || a.code)),
         h("p", { class: "muted" }, who ? h("a", { href: `#/shoots/${shoot.id}` }, who.name) : a.client && a.title ? a.client : "",
           a.date ? `${who || (a.client && a.title) ? " · " : ""}${day(a.date)}` : ""),
-        h("p", {}, `${plural(a.count, "file")}${a.count ? ` · ${size(a.size)}` : ""}${a.locked ? " · Password" : ""}`),
+        h("p", {}, `${plural(a.count, "file")}${a.count ? ` · ${size(a.size)}` : ""}${a.lockedBy === "email" ? " · Opens by email" : a.locked ? " · Password" : ""}`),
         h("p", { class: a.expired ? "warn" : "muted" }, a.expired ? `Expired ${day(a.expires)}` : a.expires ? `Open until ${day(a.expires)}` : "No end date")),
       h("button", { type: "button", class: "btn btn-line small", onclick: () => copy(a.link) }, "Copy link"));
   }));
@@ -275,50 +275,49 @@ async function albumScreen(code) {
   });
 
   // ----- password -----
-  // Galleries made before passwords existed have none; one can be added here, but nothing changes unless you do.
+  // A gallery opens with the client's email (any of a group's), with an older gallery's own password, or for anyone
+  // with the link. Galleries made before passwords existed stay open unless you change that here.
   const passPanel = h("section", { class: "panel" });
   function showPass() {
+    const emails = crm.emailsOf(client);
     const known = shoot?.galleryPass || "";
-    const editBox = crm.passwordBox(known || crm.makePassword(), true);
-    const saveBtn = h("button", { type: "button", class: "btn btn-primary small", onclick: async () => {
-      let password;
-      try { password = editBox.value(); } catch (e) { return toast(e.message, true); }
-      if (!password) return toast("Type a password, or use Remove password.", true);
-      saveBtn.disabled = true;
-      try {
-        await api("PUT", `/api/albums/${enc(code)}/password`, { password });
-        await crm.setGalleryPass(code, password);
-        a.locked = true;
-        dropAlbums();
-        toast("Password saved. Send the new one to the client.");
-        showPass();
-      } catch (e) { saveBtn.disabled = false; if (!(e instanceof Locked)) toast(e.message, true); }
-    } }, a.locked ? "Change password" : "Add password");
-    const form = h("div", { hidden: true }, editBox.el, h("div", { class: "row" }, saveBtn,
-      h("button", { type: "button", class: "btn btn-line small", onclick: () => { form.hidden = true; opener.hidden = false; } }, "Cancel")));
-    editBox.el.querySelector(".check").hidden = true; // here the box is always on; "Remove password" turns it off
-    const opener = h("div", { class: "row" },
-      h("button", { type: "button", class: "btn btn-line small", onclick: () => { form.hidden = false; opener.hidden = true; } },
-        a.locked ? "Change password" : "Add a password"),
-      a.locked ? h("button", { type: "button", class: "btn btn-line small", onclick: async (e) => {
-        if (!confirm("Remove the password? Anyone with the link will be able to open this gallery.")) return;
-        e.target.disabled = true;
-        try {
-          await api("PUT", `/api/albums/${enc(code)}/password`, { password: "" });
-          await crm.setGalleryPass(code, "");
-          a.locked = false;
-          dropAlbums();
-          toast("Password removed. Anyone with the link can open it now.");
-          showPass();
-        } catch (ex) { e.target.disabled = false; if (!(ex instanceof Locked)) toast(ex.message, true); }
-      } }, "Remove password") : null);
-    passPanel.replaceChildren(h("h2", {}, "Password"),
-      a.locked
+    const act = (fn) => async (e) => {
+      const b = e.currentTarget;
+      b.disabled = true;
+      try { await fn(); showPass(); } catch (ex) { b.disabled = false; if (!(ex instanceof Locked)) toast(ex.message, true); }
+    };
+    const setLock = async (body, by) => {
+      await api("PUT", `/api/albums/${enc(code)}/password`, body);
+      await crm.setGalleryLock(code, by);
+      a.locked = !!by;
+      a.lockedBy = by;
+      dropAlbums();
+    };
+    const useEmails = emails.length ? h("button", { type: "button", class: `btn ${a.lockedBy === "email" ? "btn-line" : "btn-primary"} small`,
+      onclick: act(async () => {
+        await setLock({ emails }, "email");
+        toast(emails.length > 1 ? `Saved. Any of the ${emails.length} emails opens it.` : "Saved. Their email opens it.");
+      }) }, a.lockedBy === "email" ? "Use the client's emails" : "Open with the client's email") : null;
+    const removeIt = act(async () => {
+      await setLock({ password: "" }, "");
+      toast("Password removed. Anyone with the link can open it now.");
+    });
+    const remove = a.locked ? h("button", { type: "button", class: "btn btn-line small", onclick: (e) => {
+      if (confirm("Remove the password? Anyone with the link will be able to open this gallery.")) removeIt(e);
+    } }, "Remove password") : null;
+    const list = h("code", {}, emails.join(", "));
+    const state = a.lockedBy === "email"
+      ? h("p", {}, emails.length > 1 ? "Clients open it with their email. Any of these works: " : emails.length ? "Clients open it with their email: " : "Clients open it with their email.", emails.length ? list : "")
+      : a.locked
         ? (known ? h("p", {}, "Clients need this password to open the gallery: ", h("code", {}, known), " ",
             h("button", { type: "button", class: "linkish", onclick: () => copy(known, "Password") }, "Copy"))
-          : h("p", {}, "Clients need a password to open this gallery. (It isn't saved in your records, so if you've lost it, change it.)"))
-        : h("p", { class: "muted" }, "No password: anyone with the link can open this gallery."),
-      opener, form);
+          : h("p", {}, "Clients need a password to open this gallery. (It isn't saved in your records.)"))
+        : h("p", { class: "muted" }, "No password: anyone with the link can open this gallery.");
+    const hint = !client ? h("p", { class: "muted small" }, "Link this gallery to a client's shoot to open it with their email.")
+      : !emails.length ? h("p", { class: "muted small" }, `${client.name} has no email in your records. `, h("a", { href: `#/clients/${client.id}/edit` }, "Add one"), " to open it with their email.")
+      : a.lockedBy === "email" ? h("p", { class: "muted small" }, "Changing the client's emails updates this by itself.")
+      : null;
+    passPanel.replaceChildren(h("h2", {}, "Password"), state, hint, h("div", { class: "row" }, useEmails, remove));
   }
   showPass();
 
@@ -342,7 +341,7 @@ async function albumScreen(code) {
     h("div", { class: "link-row" },
       h("code", {}, a.link),
       h("button", { type: "button", class: "btn btn-primary small", onclick: () => copy(a.link) }, "Copy link"),
-      client?.email ? h("a", { class: "btn btn-line small", href: crm.emailHref(client, shoot, a.link, a.expires) }, "Email link") : null,
+      crm.canEmail(client) ? h("a", { class: "btn btn-line small", href: crm.emailHref(client, shoot, a.link, a.expires) }, "Email link") : null,
       h("a", { href: a.link, target: "_blank", rel: "noopener", class: "btn btn-line small" }, "Open")),
     drop, fileInput, progress,
     h("div", { class: "head files-head" }, h("h2", {}, "Files"), countLine, delBtn),

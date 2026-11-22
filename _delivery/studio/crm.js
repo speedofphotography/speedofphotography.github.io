@@ -52,6 +52,10 @@ const byDate = (a, b) => (a.date || "9999").localeCompare(b.date || "9999");
 const byDateDesc = (a, b) => (b.date || "").localeCompare(a.date || "");
 const shootsOf = (clientId) => doc.shoots.filter((s) => s.clientId === clientId).sort(byDateDesc);
 export const carsOf = (c) => (c?.cars || "").split(/\n|,/).map((s) => s.trim()).filter(Boolean);
+// A client can have several emails (a group booking), kept one per line. Same rules as the website's emailList().
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const splitEmails = (v) => String(v || "").split(/[\s,;]+/).map((e) => e.normalize("NFC").trim().toLowerCase()).filter(Boolean);
+export const emailsOf = (c) => [...new Set(splitEmails(c?.email).filter((e) => EMAIL_RE.test(e)))];
 export const shootForGallery = (code) => doc?.shoots.find((s) => s.gallery === code);
 // ---------- gallery length ----------
 // How long a gallery stays open. The default for new galleries is set in Settings.
@@ -81,16 +85,17 @@ export async function importBookings() {
     const email = (b.email || "").trim().toLowerCase();
     const phone = digits(b.phone);
     const ig = handle(b.instagram);
-    let c = doc.clients.find((x) => email && (x.email || "").toLowerCase() === email)
+    let c = doc.clients.find((x) => email && emailsOf(x).includes(email))
       || doc.clients.find((x) => phone.length >= 7 && digits(x.phone) === phone)
       || doc.clients.find((x) => ig && handle(x.instagram) === ig);
     if (!c) {
-      c = { id: newId(), name: b.name || "Website booking", email: b.email || "", phone: b.phone || "", instagram: ig, cars: "",
+      c = { id: newId(), name: b.name || "Website booking", email: EMAIL_RE.test(email) ? email : "", phone: b.phone || "", instagram: ig, cars: "",
         source: b.source || "Website booking form", notes: "", created: b.received || now() };
       doc.clients.push(c);
     } else {
       // Fill in what's missing; never overwrite what you've already entered.
-      if (!c.email && b.email) c.email = b.email;
+      // The email they booked with opens their galleries, so it joins the client's list.
+      if (EMAIL_RE.test(email) && !emailsOf(c).includes(email)) c.email = [...emailsOf(c), email].join("\n");
       if (!c.phone && b.phone) c.phone = b.phone;
       if (!c.instagram && ig) c.instagram = ig;
       if (!c.source && b.source) c.source = b.source;
@@ -131,13 +136,17 @@ export const shootName = (s) => s.title || [clientOf(s.clientId)?.name, s.car].f
 const igUrl = (handle) => `https://www.instagram.com/${encodeURIComponent(handle.replace(/^@/, ""))}/`;
 
 export function emailHref(c, s, link, expires) {
-  const first = (c.name || "").split(" ")[0] || "there";
+  const to = emailsOf(c);
+  const first = to.length > 1 ? "everyone" : (c.name || "").split(" ")[0] || "there";
   const what = s?.car ? `your ${s.car} shoot` : "your shoot";
-  const body = `Hi ${first},\n\nThe photos from ${what} are ready:\n${link}\n\n` +
-    (s?.galleryPass ? `Password: ${s.galleryPass}\n\n` : "") +
+  const open = s?.galleryBy === "email"
+    ? (to.length > 1 ? "To open it, enter your email address (any of the ones this was sent to works).\n\n" : "To open it, enter your email address.\n\n")
+    : s?.galleryPass ? `Password: ${s.galleryPass}\n\n` : "";
+  const body = `Hi ${first},\n\nThe photos from ${what} are ready:\n${link}\n\n` + open +
     (expires ? `You can view and download them until ${day(expires)}.\n\n` : "") + "Thanks again!\nSpeed Of Photography";
-  return `mailto:${encodeURIComponent(c.email)}?subject=${encodeURIComponent("Your photos are ready")}&body=${encodeURIComponent(body)}`;
+  return `mailto:${to.map(encodeURIComponent).join(",")}?subject=${encodeURIComponent("Your photos are ready")}&body=${encodeURIComponent(body)}`;
 }
+export const canEmail = (c) => emailsOf(c).length > 0;
 
 // ---------- small pieces ----------
 
@@ -301,7 +310,7 @@ export async function clientsScreen() {
       const last = lastShoot(c);
       return h("a", { href: `#/clients/${c.id}`, class: "row-link client-row" },
         h("span", { class: "what" }, h("strong", {}, c.name), h("span", { class: "muted" }, carsOf(c).join(", "))),
-        h("span", { class: "muted" }, c.instagram ? `@${c.instagram.replace(/^@/, "")}` : c.email || c.phone),
+        h("span", { class: "muted" }, c.instagram ? `@${c.instagram.replace(/^@/, "")}` : emailsOf(c)[0] || c.phone),
         h("span", { class: "muted" }, last ? `Last shoot ${day(last.date)}` : "No shoots yet"));
     }) : [h("p", { class: "muted" }, doc.clients.length ? "No one matches." : "No clients yet.")]));
   };
@@ -322,7 +331,8 @@ export async function clientForm(id, then) {
   const form = busyForm(h("form", { class: "panel narrow", autocomplete: "off" },
     h("h1", {}, c ? "Edit client" : "New client"),
     field("Name", h("input", { name: "name", maxlength: "120", value: v.name || "" })),
-    field("Email", h("input", { name: "email", type: "email", maxlength: "200", value: v.email || "" })),
+    field("Emails", h("textarea", { name: "email", rows: "2", maxlength: "6000", spellcheck: "false", autocapitalize: "off" }, emailsOf(v).join("\n") || v.email || ""),
+      "One per line. For a group, add everyone's: any of these emails opens their galleries."),
     field("Phone", h("input", { name: "phone", type: "tel", maxlength: "60", value: v.phone || "" })),
     field("Instagram", h("input", { name: "instagram", maxlength: "80", value: v.instagram || "", placeholder: "@handle" })),
     field("Cars", h("textarea", { name: "cars", rows: "2", maxlength: "1000" }, v.cars || ""), "One per line."),
@@ -335,11 +345,16 @@ export async function clientForm(id, then) {
     const data = Object.fromEntries([...d].map(([k, x]) => [k, String(x).trim()]));
     if (!data.name) data.name = c?.name || "Unnamed client";
     data.instagram = data.instagram.replace(/^@/, "").replace(/^https?:\/\/(www\.)?instagram\.com\//, "").replace(/\/.*$/, "");
+    const bad = splitEmails(data.email).filter((e) => !EMAIL_RE.test(e));
+    if (bad.length) throw new Error(`${bad.join(", ")} ${bad.length > 1 ? "don't" : "doesn't"} look like an email. Put one email on each line.`);
+    data.email = emailsOf(data).join("\n");
+    const before = emailsOf(c).join("\n");
     const target = c || { id: newId(), created: now() };
     Object.assign(target, data);
     if (!c) doc.clients.push(target);
     await save();
-    toast(c ? "Saved." : "Client added.");
+    const synced = c && before !== data.email ? await syncGalleryEmails(target) : "";
+    toast(synced || (c ? "Saved." : "Client added."), synced.startsWith("Saved, but"));
     go(then === "shoot" ? `#/shoots/new?client=${target.id}` : then === "gallery" ? `#/galleries/new?client=${target.id}` : `#/clients/${target.id}`);
   });
   show(back(c ? `#/clients/${c.id}` : "#/clients", c ? c.name : "Clients"), form);
@@ -352,7 +367,7 @@ export async function clientScreen(id) {
   if (!c) return show(back("#/clients", "Clients"), h("p", { class: "muted" }, "That client isn't in your records."));
   const shoots = shootsOf(c.id);
   const contact = [
-    c.email && h("a", { href: `mailto:${c.email}` }, c.email),
+    ...emailsOf(c).map((e) => h("a", { href: `mailto:${e}` }, e)),
     c.phone && h("a", { href: `tel:${c.phone.replace(/[^\d+]/g, "")}` }, c.phone),
     c.instagram && h("a", { href: igUrl(c.instagram), target: "_blank", rel: "noopener" }, `@${c.instagram}`),
   ].filter(Boolean);
@@ -391,7 +406,7 @@ function exportCsv() {
   const rows = [["Name", "Email", "Phone", "Instagram", "Cars", "Found you through", "Shoots", "Last shoot", "Notes"]];
   for (const c of [...doc.clients].sort((a, b) => a.name.localeCompare(b.name))) {
     const s = shootsOf(c.id);
-    rows.push([c.name, c.email, c.phone, c.instagram, carsOf(c).join("; "), c.source, s.length, s[0]?.date || "", c.notes]);
+    rows.push([c.name, emailsOf(c).join("; "), c.phone, c.instagram, carsOf(c).join("; "), c.source, s.length, s[0]?.date || "", c.notes]);
   }
   const blob = new Blob(["﻿" + rows.map((r) => r.map(cell).join(",")).join("\r\n")], { type: "text/csv" });
   const a = h("a", { href: URL.createObjectURL(blob), download: `SOP clients ${today()}.csv` });
@@ -507,9 +522,11 @@ function galleryPanel(s, c, { createGallery, loadAlbums, refresh }) {
     box.append(
       h("div", { class: "link-row" }, h("code", {}, link),
         h("button", { type: "button", class: "btn btn-primary small", onclick: () => copy(link) }, "Copy link"),
-        c?.email ? h("a", { class: "btn btn-line small", href: emailHref(c, s, link) }, "Email link") : null,
+        canEmail(c) ? h("a", { class: "btn btn-line small", href: emailHref(c, s, link) }, "Email link") : null,
         h("a", { href: `#/g/${s.gallery}`, class: "btn btn-line small" }, "Manage photos")),
-      s.galleryPass ? h("p", { class: "muted" }, "Password: ", h("code", {}, s.galleryPass), " ",
+      s.galleryBy === "email" ? h("p", { class: "muted" }, emailsOf(c).length > 1 ? "Opens with any of: " : "Opens with: ",
+        h("code", {}, emailsOf(c).join(", ") || "the client's email")) : null,
+      s.galleryBy !== "email" && s.galleryPass ? h("p", { class: "muted" }, "Password: ", h("code", {}, s.galleryPass), " ",
         h("button", { type: "button", class: "linkish", onclick: () => copy(s.galleryPass, "Password") }, "Copy")) : null,
       h("button", { type: "button", class: "linkish", onclick: async () => {
         if (!confirm("Unlink this gallery from the shoot? The gallery itself stays.")) return;
@@ -539,33 +556,48 @@ function galleryPanel(s, c, { createGallery, loadAlbums, refresh }) {
 
 // ---------- new gallery ----------
 // Every new gallery is for a client in your records and is linked to one of their shoots: one picked here, or a new
-// shoot made with it. It has a password unless you untick the box. The password is kept with the shoot (encrypted
-// like all your records) so you can see it again, and "Email link" puts it in the message.
-const PASS_ABC = "abcdefghjkmnpqrstuvwxyz23456789";
-export function makePassword() {
-  const out = Array.from(crypto.getRandomValues(new Uint32Array(8)), (n) => PASS_ABC[n % PASS_ABC.length]).join("");
-  return `${out.slice(0, 4)}-${out.slice(4)}`;
-}
-export const MIN_PASS = 4;
+// shoot made with it. It opens with the client's email (any of them, for a group) unless you untick the box.
 
-// The password box for a gallery: on by default, with a suggestion you can replace with your own.
-export function passwordBox(value = makePassword(), on = true) {
-  const box = h("input", { type: "checkbox", checked: on });
-  const input = h("input", { maxlength: "200", value, autocomplete: "off", spellcheck: "false", "aria-label": "Gallery password" });
-  const row = h("div", { class: "row pass-row" }, input,
-    h("button", { type: "button", class: "btn btn-line small", onclick: () => { input.value = makePassword(); input.focus(); } }, "Suggest one"));
-  const sync = () => { row.hidden = !box.checked; input.required = box.checked; };
-  box.addEventListener("change", () => { sync(); if (box.checked) input.focus(); });
-  sync();
+// After a client's emails change, every gallery of theirs that opens by email takes the new list. (Galleries left
+// open, and older ones with their own password, stay as they are.) Returns a message for the toast.
+export async function syncGalleryEmails(c) {
+  const emails = emailsOf(c);
+  const codes = [...new Set(shootsOf(c.id).map((s) => s.gallery).filter(Boolean))];
+  if (!codes.length) return "";
+  if (!emails.length) return "Saved, but with no email left, their galleries still open with the old ones. Add an email to change that.";
+  let changed = 0, failed = 0;
+  for (const code of codes) {
+    try {
+      const r = await api("PUT", `/api/albums/${encodeURIComponent(code)}/password`, { emails, onlyIfEmail: true });
+      if (r.changed) changed++;
+    } catch (e) { if (e instanceof Locked) throw e; failed++; }
+  }
+  if (failed) return `Saved, but ${failed === 1 ? "1 gallery" : `${failed} galleries`} couldn't be updated with the new emails. Open it and use "Use the client's emails".`;
+  return changed ? `Saved. ${changed === 1 ? "1 gallery opens" : `${changed} galleries open`} with these emails now.` : "";
+}
+
+// The "opens with their email" box on the new-gallery form. On by default; untick to leave the gallery open.
+function emailLockBox() {
+  const box = h("input", { type: "checkbox", checked: true });
+  const who = h("small", {});
+  let client = null;
+  const sync = () => {
+    const list = emailsOf(client);
+    who.replaceChildren(!box.checked ? "Anyone with the link can open it."
+      : !client ? "Pick a client first."
+      : list.length > 1 ? `Any of these works: ${list.join(", ")}.`
+      : list.length ? `Their email: ${list[0]}.`
+      : h("span", { class: "warn" }, `${client.name} has no email in your records yet. Add one (Edit client), or untick the box.`));
+  };
+  box.addEventListener("change", sync);
   return {
     el: h("div", { class: "field" }, h("span", {}, "Password"),
-      h("label", { class: "check" }, box, " Clients need a password to open it"), row,
-      h("small", {}, "Type your own or keep the suggestion, and send it to the client with the link (Email link includes it). Untick to let anyone with the link open it.")),
-    value: () => {
-      if (!box.checked) return "";
-      const v = input.value.trim();
-      if (v.length < MIN_PASS) throw new Error(`Choose a password of at least ${MIN_PASS} characters, or untick the password box.`);
-      return v;
+      h("label", { class: "check" }, box, " Clients open it with their email (the one they booked with)"), who),
+    setClient: (c) => { client = c; sync(); },
+    open: () => {
+      if (!box.checked) return true;
+      if (!emailsOf(client).length) throw new Error(`${client?.name || "This client"} has no email in your records yet. Add one (Edit client), or untick the box to leave the gallery open.`);
+      return false;
     },
   };
 }
@@ -588,7 +620,7 @@ export async function galleryForm(q, { createGallery, lengthField }) {
   carInput.setAttribute("list", "gallery-car-list");
   const dateInput = h("input", { name: "date", type: "date", value: preShoot?.date || today() });
   const length = lengthField(galleryDays());
-  const pass = passwordBox();
+  const pass = emailLockBox();
 
   // The client's shoots that don't have a gallery yet; the newest one that's been shot is picked to start with.
   function fillShoots() {
@@ -599,6 +631,7 @@ export async function galleryForm(q, { createGallery, lengthField }) {
     const pick = preShoot && open.includes(preShoot) ? preShoot : open.find((s) => ["shot", "editing"].includes(s.status));
     shootSel.value = pick ? pick.id : "new";
     carList.replaceChildren(...carsOf(c).map((x) => h("option", { value: x })));
+    pass.setClient(c);
     fillFromShoot();
   }
   function fillFromShoot() {
@@ -626,13 +659,13 @@ export async function galleryForm(q, { createGallery, lengthField }) {
   async (d) => {
     const c = clientOf(clientSel.value);
     if (!c) throw new Error("Pick a client for this gallery.");
-    const password = pass.value();
+    const open = pass.open();
     const car = carInput.value.trim();
     const date = dateInput.value;
     const code = await createGallery({
       clientId: c.id, client: c.name, car, date, expires: length.end(),
       title: String(d.get("title") || "").trim() || (car ? `${c.name}'s ${car}` : `${c.name}'s photos`),
-      message: String(d.get("message") || ""), password, open: !password,
+      message: String(d.get("message") || ""), open,
     });
     let s = shootOf(shootSel.value);
     if (!s) {
@@ -641,7 +674,8 @@ export async function galleryForm(q, { createGallery, lengthField }) {
       doc.shoots.push(s);
     } else if (["inquiry", "booked", "shot"].includes(s.status)) s.status = "editing";
     s.gallery = code;
-    s.galleryPass = password;
+    s.galleryPass = "";
+    s.galleryBy = open ? "" : "email";
     if (car && !carsOf(c).some((x) => x.toLowerCase() === car.toLowerCase())) c.cars = [...carsOf(c), car].join("\n");
     try { await save(); }
     catch (e) { if (!(e instanceof Locked)) toast(`Gallery made, but linking it to the shoot didn't save: ${e.message}`, true); }
@@ -650,11 +684,12 @@ export async function galleryForm(q, { createGallery, lengthField }) {
   show(back(preShoot ? `#/shoots/${preShoot.id}` : "#/galleries", preShoot ? shootName(preShoot) : "Galleries"), form);
 }
 
-// After a gallery's password changes in Studio, the shoot it belongs to remembers the new one.
-export async function setGalleryPass(code, password) {
+// After a gallery's lock changes in Studio, the shoot it belongs to remembers how it opens now.
+export async function setGalleryLock(code, by) {
   await load();
   const s = doc.shoots.find((x) => x.gallery === code);
-  if (!s || (s.galleryPass || "") === password) return;
-  s.galleryPass = password;
+  if (!s || ((s.galleryBy || "") === by && !s.galleryPass)) return;
+  s.galleryBy = by;
+  s.galleryPass = "";
   await save();
 }

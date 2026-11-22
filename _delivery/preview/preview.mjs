@@ -53,6 +53,12 @@ const SAMPLES = {
     photos: ["porsche-gt3-rs-canyon.jpg", "huracan-above.jpg", "laferrari-doors-up.jpg", "porsche-993-turbo.jpg",
       "aventador-night.jpg", "emira-track-rolling.jpg", "gt4-garage.jpg", "lamborghini-interior.jpg", "carrera-gt-garage.jpg"],
   },
+  // Opens with either of these emails (a group booking).
+  "demo-email-e7k2rv": {
+    meta: { title: "Demo: gallery opened by email", client: "Sample group", date: "2026-11-22", expires: "2099-12-31" },
+    emails: ["driver@example.com", "Friend@Example.com"],
+    photos: ["porsche-gt3-rs-canyon.jpg", "huracan-above.jpg", "aventador-night.jpg"],
+  },
   "demo-plain-x4m2pq": { meta: null, photos: ["miata-salt-flats.jpg", "evo-x-salt-flats.jpg", "porsche-992-gt3.jpg"] },
   "demo-expired-r8t3vw": { meta: { title: "Old gallery", expires: "2024-01-31" }, photos: ["gt4-garage.jpg"] },
 };
@@ -144,10 +150,10 @@ ${body}
   if (!header) console.log("(Couldn't reach the live site, so the preview has no header or footer.)");
 }
 
-const SEED_VERSION = "3"; // bump when SAMPLES change, so the next start rebuilds them
+const SEED_VERSION = "4"; // bump when SAMPLES change, so the next start rebuilds them
 
 async function seed() {
-  const { makeLock } = await import(new URL("../../_functions_lib/delivery.js", import.meta.url));
+  const { makeLock, makeEmailLock } = await import(new URL("../../_functions_lib/delivery.js", import.meta.url));
   console.log("Filling the pretend R2 bucket with sample galleries (first run only, about a minute)...");
   fs.rmSync(state, { recursive: true, force: true });
   const tmp = path.join(work, "seed-tmp");
@@ -166,7 +172,8 @@ async function seed() {
     }
     if (g.meta) {
       const f = path.join(tmp, `${code}.json`);
-      const meta = g.password ? { ...g.meta, access: await makeLock(g.password) } : g.meta;
+      const access = g.password ? await makeLock(g.password) : g.emails ? await makeEmailLock(g.emails) : null;
+      const meta = access ? { ...g.meta, access } : g.meta;
       fs.writeFileSync(f, JSON.stringify(meta, null, 2));
       put(`${code}/gallery.json`, f);
     }

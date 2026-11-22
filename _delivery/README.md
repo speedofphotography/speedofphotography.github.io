@@ -5,10 +5,12 @@ The page shows their photos in the site's own style. They can view each one full
 single originals, save straight to Photos on a phone, or **Download all** as one zip.
 
 Galleries made in SOP Studio are always for a client in your records (picked when you create it, and linked
-to one of their shoots) and have a password you choose, unless you untick the password box. The client types it
-once; the browser then stays let in for 30 days. Change or remove a gallery's password on its page in Studio
-(changing it signs everyone out). The password is kept with the shoot in your encrypted records, and Email link
-includes it. gallery.json only holds a salted hash of it.
+to one of their shoots) and open with the client's email: the one they booked with, or any of a group's (a
+client can have several emails, one per line). Untick the box to leave a gallery open instead. The client types
+their email once; the browser then stays let in for 30 days. Editing a client's emails updates every gallery of
+theirs that opens by email. Galleries made earlier with their own password keep it until you switch them to the
+client's emails (or remove the password) on the gallery's page in Studio. gallery.json only holds salted hashes,
+never the emails or passwords themselves.
 
 Galleries without a password (every gallery made before passwords existed, and any you make with the box
 unticked) open for anyone with the link, so the code at the end of the link is the key. Make it something nobody

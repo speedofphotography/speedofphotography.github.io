@@ -1,5 +1,6 @@
 // GET  /api/gallery/<code> : the gallery's details and file list, for /g/<code>/.
-// POST /api/gallery/<code> : { password } for a gallery with a password; answers with a key ("k") the page adds
+// POST /api/gallery/<code> : { password } for a gallery with a password (or the client's email, for a gallery
+//                            opened by email); answers with a key ("k") the page adds
 //                            to every gallery address (see Gallery passwords in _functions_lib/delivery.js).
 // Galleries without a password (every gallery made before passwords existed) work exactly as before.
 import {
@@ -21,7 +22,8 @@ export async function onRequestGet({ request, params, env }) {
   const meta = await readMeta(bucket, code);
   if (meta.found && isExpired(meta)) return json({ error: "expired" }, 410);
   // A locked gallery says nothing about itself (not even its title) until the password is in.
-  if (!(await allowed(meta, code, request.url))) return json({ error: "password" }, 401);
+  // "ask" tells the page whether to ask for a password or for the client's email.
+  if (!(await allowed(meta, code, request.url))) return json({ error: "password", ask: meta.lock.email ? "email" : "password" }, 401);
 
   const files = [];
   let cursor;

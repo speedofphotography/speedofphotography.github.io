@@ -22,7 +22,7 @@ const repo = path.resolve(here, "..", "..");
 // Installed (install-studio.ps1), the app carries its own copy of the site's gallery rules and logo;
 // run from the website folder, it uses the originals.
 const installed = fs.existsSync(path.join(here, "lib", "delivery.js"));
-const { CODE_RE, META_FILE, typeOf, kindOf, isClientFile, readMeta, isExpired, makeLock, cleanPassword, cleanLook } =
+const { CODE_RE, META_FILE, typeOf, kindOf, isClientFile, readMeta, isExpired, makeLock, makeEmailLock, emailList, cleanPassword, cleanLook } =
   await import(installed ? "./lib/delivery.js" : "../../_functions_lib/delivery.js");
 const SITE = "https://speedofphotography.com";
 const IDLE_MS = 30 * 60 * 1000;
@@ -234,13 +234,15 @@ async function eachLimit(items, limit, fn) {
 
 // A password needs at least this many characters. Galleries made before passwords existed have none and stay open.
 const MIN_PASS = 4;
+// How a gallery is opened: "email" (the client's emails), "password" (an older gallery's own password) or "" (open).
+const lockedBy = (lock) => (lock ? (lock.email ? "email" : "password") : "");
 const saveMetaFile = (code, meta) => state.r2.put(`${code}/${META_FILE}`, JSON.stringify(meta, null, 2) + "\n", "application/json");
 
 async function summary(code) {
   const [{ files }, meta] = await Promise.all([filesOf(code), metaOf(code)]);
   const { found, lock, order, ...details } = meta;
   return {
-    code, link: linkFor(code), ...details, locked: !!lock, expired: isExpired(meta),
+    code, link: linkFor(code), ...details, locked: !!lock, lockedBy: lockedBy(lock), expired: isExpired(meta),
     count: files.length, size: files.reduce((s, f) => s + f.size, 0),
     updated: files.reduce((m, f) => (f.modified > m ? f.modified : m), ""),
     cover: (files.find((f) => f.thumb) || {}).name || "",
@@ -383,16 +385,18 @@ const api = {
     send(res, 200, { albums });
   },
 
-  // Every new gallery is for a client in your records, and has a password unless you chose to leave it open.
+  // Every new gallery is for a client in your records. It opens with any of that client's emails (the one they booked
+  // with, or each of a group's), unless you chose to leave it open to anyone with the link.
   async createAlbum(req, res) {
     const b = await readJson(req);
     const doc = await state.crm.load();
-    if (!doc.clients.some((c) => c.id === b.clientId)) return fail(res, 400, "Pick a client for this gallery.");
+    const client = doc.clients.find((c) => c.id === b.clientId);
+    if (!client) return fail(res, 400, "Pick a client for this gallery.");
     const open = b.open === true;
-    const password = cleanPassword(b.password);
-    if (!open && password.length < MIN_PASS) return fail(res, 400, `Choose a password of at least ${MIN_PASS} characters, or untick the password box.`);
+    const emails = emailList(client.email);
+    if (!open && !emails.length) return fail(res, 400, `${client.name || "This client"} has no email in your records yet. Add one (Edit client), or untick the box to leave the gallery open.`);
     const meta = cleanMeta(b);
-    if (!open) meta.access = await makeLock(password);
+    if (!open) meta.access = await makeEmailLock(emails);
     let code;
     for (let i = 0; i < 5 && !code; i++) {
       const c = makeCode(text(b.client, 120), text(b.car, 120));
@@ -407,7 +411,7 @@ const api = {
     const [{ files }, meta] = await Promise.all([filesOf(code), metaOf(code)]);
     if (!files.length && !meta.found) return fail(res, 404, "There's no gallery with that link.");
     const { found, lock, ...details } = meta;
-    send(res, 200, { code, link: linkFor(code), ...details, locked: !!lock, expired: isExpired(meta), files });
+    send(res, 200, { code, link: linkFor(code), ...details, locked: !!lock, lockedBy: lockedBy(lock), expired: isExpired(meta), files });
   },
 
   // Saving the details keeps the gallery's password (or lack of one) and its layout as they are.
@@ -433,16 +437,26 @@ const api = {
     send(res, 200, look);
   },
 
-  // { password }: sets or changes the password. An empty one removes it, so anyone with the link can open it.
+  // { emails }: the gallery opens with any of these emails. With "onlyIfEmail" it changes only a gallery that
+  // already opens by email (used when a client's emails are edited, so open galleries stay open).
+  // { password }: an older-style password. An empty one removes the lock, so anyone with the link can open it.
   async setPassword(req, res, code) {
-    const password = cleanPassword((await readJson(req)).password);
-    if (password && password.length < MIN_PASS) return fail(res, 400, `Use at least ${MIN_PASS} characters.`);
+    const b = await readJson(req);
     const old = await metaOf(code);
     if (!old.found) return fail(res, 404, "There's no gallery with that link.");
     const meta = cleanMeta(old);
-    if (password) meta.access = await makeLock(password);
+    if (b.emails !== undefined) {
+      if (b.onlyIfEmail === true && !old.lock?.email) return send(res, 200, { locked: !!old.lock, lockedBy: lockedBy(old.lock), changed: false });
+      const emails = emailList(b.emails);
+      if (!emails.length) return fail(res, 400, "Add the client's email first (Edit client).");
+      meta.access = await makeEmailLock(emails, old.lock);
+    } else {
+      const password = cleanPassword(b.password);
+      if (password && password.length < MIN_PASS) return fail(res, 400, `Use at least ${MIN_PASS} characters.`);
+      if (password) meta.access = await makeLock(password);
+    }
     await saveMetaFile(code, meta);
-    send(res, 200, { locked: !!password });
+    send(res, 200, { locked: !!meta.access, lockedBy: lockedBy(meta.access), changed: true });
   },
 
   async deleteAlbum(req, res, code) {
