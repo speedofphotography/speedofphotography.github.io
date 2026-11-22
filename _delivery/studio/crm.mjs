@@ -48,11 +48,14 @@ export const STATUSES = ["inquiry", "booked", "shot", "editing", "delivered", "c
 export const PAYMENTS = ["unpaid", "deposit", "paid"];
 export const NOTE_KINDS = ["note", "call", "email", "message", "meeting"];
 
+const TEMPLATE = { subject: str(200), eyebrow: str(60), heading: str(120), message: str(10000), stepsTitle: str(60), steps: str(5000), sign: str(500) };
+
 const SCHEMA = {
   clients: { id: ID, name: str(120), email: str(6000), phone: str(60), instagram: str(80), cars: str(1000),
     source: str(60), notes: str(5000), created: str(40) },
   shoots: { id: ID, clientId: ID, car: str(120), title: str(160), date: str(10), time: str(10), location: str(200),
     package: str(120), status: oneOf(STATUSES), payment: oneOf(PAYMENTS), amount: str(40), gallery: str(90), galleryPass: str(200), galleryBy: oneOf(["", "email", "password"]),
+    sentThanks: str(40), sentGallery: str(40),
     notes: str(5000), created: str(40), bookingId: str(80) },
   notes: { id: ID, clientId: ID, shootId: ID, at: str(40), kind: oneOf(NOTE_KINDS), text: str(5000) },
   tasks: { id: ID, clientId: ID, shootId: ID, due: str(10), text: str(500), done: (v) => v === true, doneAt: str(40) },
@@ -63,6 +66,16 @@ export function clean(doc) {
   out.rev = Number.isInteger(doc?.rev) ? doc.rev : 0;
   const days = doc?.settings?.galleryDays;
   if (Number.isInteger(days) && days >= 0 && days <= 3650) out.settings.galleryDays = days;
+  // Your own wording for the emails (Settings > Email wording), per kind of email.
+  const tpl = doc?.settings?.templates;
+  if (tpl && typeof tpl === "object") {
+    out.settings.templates = {};
+    for (const kind of ["thanks", "gallery"]) {
+      const t = tpl[kind];
+      if (!t || typeof t !== "object") continue;
+      out.settings.templates[kind] = Object.fromEntries(Object.entries(TEMPLATE).map(([k, fix]) => [k, fix(t[k])]));
+    }
+  }
   for (const [list, fields] of Object.entries(SCHEMA)) {
     const seen = new Set();
     for (const item of Array.isArray(doc?.[list]) ? doc[list].slice(0, 20000) : []) {

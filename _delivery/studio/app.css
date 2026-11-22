@@ -247,3 +247,15 @@ ol.steps { margin: 0 0 14px; padding-left: 20px; line-height: 1.6; }
   .compose-preview { position: static; }
   .mail-frame { height: 640px; }
 }
+
+/* The two emails on a gallery page, and the wording settings. */
+.mail-picks { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px; margin-bottom: 10px; }
+.mail-pick { display: grid; gap: 4px; padding: 14px 16px; color: var(--text); background: var(--surface); border: 1px solid var(--line);
+  border-left: 3px solid var(--accent); border-radius: var(--radius); text-decoration: none; }
+.mail-pick:hover, .mail-pick:focus-visible { border-color: var(--accent); outline: none; }
+.mail-pick strong { font: 700 1.1rem var(--display); text-transform: uppercase; letter-spacing: 0.05em; }
+.mail-pick small { color: var(--muted); line-height: 1.4; }
+.mail-sent { color: #4cc38a; font-size: 0.85rem; }
+details.wording { border-top: 1px solid var(--line); padding: 12px 0; }
+details.wording summary { cursor: pointer; font: 700 1.05rem var(--display); text-transform: uppercase; letter-spacing: 0.06em; }
+details.wording[open] summary { margin-bottom: 12px; }

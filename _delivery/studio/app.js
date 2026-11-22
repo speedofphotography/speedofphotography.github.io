@@ -3,7 +3,7 @@
 import { app, info, hooks, h, show, toast, api, Locked, enc, fileUrl, size, day, isoIn, plural, copy, field, busyForm, back, go } from "./ui.js";
 import * as crm from "./crm.js";
 import { lookPanel } from "./look.js";
-import { composeScreen, mailSettings } from "./mail.js";
+import { composeScreen, mailSettings, wordingSettings } from "./mail.js";
 
 const nav = document.querySelector(".bar-actions");
 let uploading = 0;
@@ -322,6 +322,20 @@ async function albumScreen(code) {
   }
   showPass();
 
+  // ----- emails to the client -----
+  // The two emails for every gallery: thanks for the shoot (with next steps), and the photos are ready.
+  const mailCard = (kind, title, about, sent) => h("a", { class: "mail-pick", href: `#/email?client=${client.id}&shoot=${shoot.id}&kind=${kind}&back=g` },
+    h("strong", {}, title), h("small", {}, about),
+    h("span", { class: sent ? "mail-sent" : "muted small" }, sent ? `Sent ${day(sent.slice(0, 10))}` : "Not sent yet"));
+  const mailPanel = h("section", { class: "panel" }, h("h2", {}, "Emails to the client"),
+    client
+      ? [h("div", { class: "mail-picks" },
+          mailCard("thanks", "Thank you + next steps", "Thanks them for the shoot and says what happens next.", shoot.sentThanks),
+          mailCard("gallery", "Photos are ready", "The gallery link, how to open it, and a photo from the gallery.", shoot.sentGallery)),
+        h("p", { class: "muted small" }, "Both open with a preview so you can check or change the words first. Set your usual wording in ",
+          h("a", { href: "#/settings" }, "Settings"), ".")]
+      : h("p", { class: "muted" }, "Link this gallery to a client's shoot (on the shoot's page) to email them from here."));
+
   // ----- layout and colour -----
   const look = lookPanel(code, a);
 
@@ -342,8 +356,8 @@ async function albumScreen(code) {
     h("div", { class: "link-row" },
       h("code", {}, a.link),
       h("button", { type: "button", class: "btn btn-primary small", onclick: () => copy(a.link) }, "Copy link"),
-      client ? h("a", { class: "btn btn-line small", href: `#/email?client=${client.id}&shoot=${shoot.id}&kind=gallery` }, "Email link") : null,
       h("a", { href: a.link, target: "_blank", rel: "noopener", class: "btn btn-line small" }, "Open")),
+    mailPanel,
     drop, fileInput, progress,
     h("div", { class: "head files-head" }, h("h2", {}, "Files"), countLine, delBtn),
     grid,
@@ -424,7 +438,7 @@ async function settingsScreen() {
   lengthSel.value = String(crm.galleryDays());
   const galleries = h("section", { class: "panel narrow" }, h("h2", {}, "Galleries"),
     field("New galleries stay open for", lengthSel, "You can still pick a different length for each gallery, and extend or shorten it later on its page."));
-  show(back("#/", "Today"), h("h1", {}, "Settings"), galleries, await mailSettings(), records, pass, keys);
+  show(back("#/", "Today"), h("h1", {}, "Settings"), galleries, await mailSettings(), wordingSettings(), records, pass, keys);
 }
 
 // ---------- routing ----------

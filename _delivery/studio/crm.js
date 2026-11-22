@@ -134,10 +134,23 @@ export async function unlinkGallery(code) {
 export const clientById = (id) => doc && clientOf(id);
 export const shootById = (id) => doc && shootOf(id);
 export const shootsOfClient = (id) => (doc ? shootsOf(id) : []);
-// A sent email goes into the client's notes (and the shoot's, if it was about one).
-export async function logEmail(clientId, shootId, text) {
+// A sent email goes into the client's notes (and the shoot's, if it was about one). The thank-you and
+// photos-ready emails are also remembered on the shoot, so its gallery page can show when each went out.
+export async function logEmail(clientId, shootId, text, kind) {
   await load();
   doc.notes.push({ id: newId(), clientId, shootId: shootId || "", at: now(), kind: "email", text });
+  const s = shootOf(shootId);
+  if (s && kind === "thanks") s.sentThanks = now();
+  if (s && kind === "gallery") s.sentGallery = now();
+  await save();
+}
+// Your own wording for the thank-you and photos-ready emails (Settings), or null for the original wording.
+export const savedTemplate = (kind) => doc?.settings?.templates?.[kind] || null;
+export async function setTemplate(kind, value) {
+  await load();
+  const all = { ...(doc.settings?.templates || {}) };
+  if (value) all[kind] = value; else delete all[kind];
+  doc.settings = { ...(doc.settings || {}), templates: all };
   await save();
 }
 export const shootName = (s) => s.title || [clientOf(s.clientId)?.name, s.car].filter(Boolean).join(" · ") || "Untitled shoot";

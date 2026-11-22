@@ -3,20 +3,40 @@
 import { h, show, toast, api, Locked, field, select, back, go } from "./ui.js";
 import * as crm from "./crm.js";
 
-const TYPES = [["gallery", "Photos ready (gallery link)"], ["booking", "Shoot booked (date, time, place)"], ["message", "Message"]];
+const TYPES = [["gallery", "Photos are ready (gallery link)"], ["thanks", "Thank you + next steps"], ["booking", "Shoot booked (date, time, place)"], ["message", "Message"]];
+
+// The original wording of the two gallery emails. Settings > Email wording replaces it with yours.
+// {name} = the client's first name ("everyone" for a group), {car} = the shoot's car, {from} = your name.
+export const DEFAULTS = {
+  thanks: {
+    subject: "Thanks for the shoot!", eyebrow: "Thank you", heading: "Thanks for the shoot",
+    message: "Hi {name},\n\nThanks for a great shoot with your {car}. I had a lot of fun with it.",
+    stepsTitle: "Next steps",
+    steps: "I'm editing your photos now.\nYou'll get an email with your gallery link as soon as they're ready.\nOpen the gallery with your email address, then view and download everything.",
+    sign: "Thanks,\n{from}",
+  },
+  gallery: {
+    subject: "Your photos are ready", eyebrow: "Your gallery", heading: "Your photos are ready",
+    message: "Hi {name},\n\nThanks again for the shoot with your {car}. Your edited photos are ready to view and download.\n\n" +
+      "Open your gallery with the button below. You can save single photos or download everything at once.",
+    stepsTitle: "", steps: "", sign: "Thanks,\n{from}",
+  },
+};
+const FIELDS = ["subject", "eyebrow", "heading", "message", "stepsTitle", "steps", "sign"];
 const shortDay = (iso) => (iso ? new Date(`${iso}T12:00`).toLocaleDateString("en-US", { month: "long", day: "numeric" }) : "");
 
 // The starting words for each kind of email. Everything can be changed before sending.
 function template(kind, c, s, from) {
   const many = crm.emailsOf(c).length > 1;
-  const hi = `Hi ${many ? "everyone" : (c?.name || "").split(" ")[0] || "there"},`;
+  const name = many ? "everyone" : (c?.name || "").split(" ")[0] || "there";
+  const hi = `Hi ${name},`;
   const car = s?.car ? ` with your ${s.car}` : "";
   const sign = `Thanks,\n${from || "Speed Of Photography"}`;
-  if (kind === "gallery") return {
-    subject: "Your photos are ready", eyebrow: "Your gallery", heading: "Your photos are ready", sign,
-    message: `${hi}\n\nThanks again for the shoot${car}. Your edited photos are ready to view and download.\n\n` +
-      "Open your gallery with the button below. You can save single photos or download everything at once.",
-  };
+  if (DEFAULTS[kind]) {
+    const t = { ...DEFAULTS[kind], ...(crm.savedTemplate(kind) || {}) };
+    const fill = (v) => String(v || "").replace(/\{name\}/g, name).replace(/\{car\}/g, s?.car || "car").replace(/\{from\}/g, from || "Speed Of Photography");
+    return Object.fromEntries(FIELDS.map((k) => [k, fill(t[k])]));
+  }
   if (kind === "booking") return {
     subject: `You're booked${s?.date ? ` for ${shortDay(s.date)}` : ""}`, eyebrow: "Shoot confirmed", heading: "You're booked", sign,
     message: `${hi}\n\nYou're all set for the shoot${car}. The details are below. If anything changes, just reply to this email.`,
@@ -30,6 +50,10 @@ export async function composeScreen(q) {
   if (!c) return show(back("#/clients", "Clients"), h("p", { class: "panel narrow" }, "Pick a client first: open them in Clients and use Send email."));
   const mail = await api("GET", "/api/mail");
   const shoots = crm.shootsOfClient(c.id);
+  // Back to where you came from: the gallery page, the shoot, or the client.
+  const fromShoot = crm.shootById(q.get("shoot") || "");
+  const backTo = q.get("back") === "g" && fromShoot?.gallery ? `#/g/${fromShoot.gallery}` : fromShoot ? `#/shoots/${fromShoot.id}` : `#/clients/${c.id}`;
+  const backLabel = q.get("back") === "g" && fromShoot?.gallery ? "Gallery" : fromShoot ? "Shoot" : c.name;
   const emails = crm.emailsOf(c);
 
   // ----- who it goes to -----
@@ -50,11 +74,15 @@ export async function composeScreen(q) {
   const buttonLabel = h("input", { maxlength: "40", value: "View your photos" });
   const cover = h("input", { type: "checkbox", checked: true });
   const galleryBits = h("div", {}, field("Button", buttonLabel), h("label", { class: "check" }, cover, " Show a photo from the gallery at the top"));
+  const stepsTitle = h("input", { maxlength: "60" });
+  const steps = h("textarea", { rows: "5", maxlength: "5000" });
+  const stepsBits = h("div", {}, field("Steps heading", stepsTitle), field("Next steps", steps, "One step per line. Each gets a blue number."));
 
   const shoot = () => crm.shootById(shootSel.value);
+  const wording = h("p", { class: "muted small" }, "Change the starting wording of this email in ", h("a", { href: "#/settings" }, "Settings"), ".");
   function fillTypes(want) {
     const s = shoot();
-    const types = TYPES.filter(([k]) => (k === "gallery" ? !!s?.gallery : k === "booking" ? !!s : true));
+    const types = TYPES.filter(([k]) => (k === "gallery" ? !!s?.gallery : k === "booking" || k === "thanks" ? !!s : true));
     typeSel.replaceChildren(...types.map(([v, label]) => h("option", { value: v }, label)));
     typeSel.value = types.some(([k]) => k === want) ? want : types[0][0];
   }
@@ -65,7 +93,11 @@ export async function composeScreen(q) {
     heading.value = t.heading;
     message.value = t.message;
     sign.value = t.sign;
+    stepsTitle.value = t.stepsTitle || "";
+    steps.value = t.steps || "";
     galleryBits.hidden = typeSel.value !== "gallery";
+    stepsBits.hidden = typeSel.value !== "thanks";
+    wording.hidden = !DEFAULTS[typeSel.value];
   }
   const s0 = shoot();
   fillTypes(q.get("kind") || (s0?.gallery ? "gallery" : s0 ? "booking" : "message"));
@@ -76,6 +108,7 @@ export async function composeScreen(q) {
   const draft = () => ({
     clientId: c.id, shootId: shootSel.value, kind: typeSel.value, to: recipients(), subject: subject.value, eyebrow: eyebrow.value,
     heading: heading.value, message: message.value, signature: sign.value, buttonLabel: buttonLabel.value, cover: cover.checked,
+    stepsTitle: stepsTitle.value, steps: steps.value,
   });
 
   // ----- preview -----
@@ -92,7 +125,7 @@ export async function composeScreen(q) {
       } catch (e) { if (!(e instanceof Locked) && mine === seq) { previewErr.textContent = e.message; previewErr.hidden = false; } }
     }, 350);
   }
-  for (const el of [subject, eyebrow, heading, message, sign, buttonLabel]) el.addEventListener("input", refresh);
+  for (const el of [subject, eyebrow, heading, message, sign, buttonLabel, stepsTitle, steps]) el.addEventListener("input", refresh);
   cover.addEventListener("change", refresh);
   const widthBtns = [["Computer", ""], ["Phone", "is-phone"]].map(([label, cls], i) =>
     h("button", { type: "button", class: "btn btn-line small", "aria-pressed": String(i === 0), onclick: (e) => {
@@ -113,8 +146,10 @@ export async function composeScreen(q) {
     field("Subject", subject),
     h("div", { class: "pair" }, field("Small heading", eyebrow, "The blue line at the top."), field("Big heading", heading)),
     field("Message", message, "A blank line starts a new paragraph."),
+    stepsBits,
     galleryBits,
     field("Sign-off", sign),
+    wording,
     mail.ready
       ? h("div", { class: "row" }, sendBtn, h("span", { class: "muted small" }, `From ${mail.address}`))
       : h("div", { class: "notice" }, h("p", {}, "To send from Studio, connect your Gmail in ", h("a", { href: "#/settings" }, "Settings"), " (once)."),
@@ -135,9 +170,9 @@ export async function composeScreen(q) {
     sendBtn.textContent = "Sending…";
     try {
       const r = await api("POST", "/api/mail/send", d);
-      await crm.logEmail(c.id, d.shootId, `Sent "${r.subject}" to ${r.to.join(", ")}.`).catch(() => {});
+      await crm.logEmail(c.id, d.shootId, `Sent "${r.subject}" to ${r.to.join(", ")}.`, d.kind).catch(() => {});
       toast(`Sent to ${r.to.join(", ")}. It's in your Gmail Sent folder too.`);
-      go(d.shootId ? `#/shoots/${d.shootId}` : `#/clients/${c.id}`);
+      go(backTo);
     } catch (ex) {
       sendBtn.disabled = false;
       sendBtn.textContent = "Send email";
@@ -145,7 +180,7 @@ export async function composeScreen(q) {
     }
   });
 
-  show(back(q.get("shoot") ? `#/shoots/${q.get("shoot")}` : `#/clients/${c.id}`, q.get("shoot") ? "Shoot" : c.name),
+  show(back(backTo, backLabel),
     h("div", { class: "compose" }, form,
       h("section", { class: "panel compose-preview" }, h("div", { class: "head" }, h("h2", {}, "Preview"), h("div", { class: "row" }, widthBtns)), previewErr, frame)));
   refresh();
@@ -202,4 +237,47 @@ export async function mailSettings() {
     }
   });
   return form;
+}
+
+// Settings > Email wording: your own starting text for the thank-you and photos-ready emails.
+export function wordingSettings() {
+  const panel = h("section", { class: "panel narrow" }, h("h2", {}, "Email wording"),
+    h("p", { class: "muted" }, "The starting text for the two emails on each gallery page. You can still change it before each send. ",
+      "Write {name} for the client's first name (\"everyone\" for a group), {car} for the car and {from} for your name."));
+  for (const [kind, title] of [["thanks", "Thank you + next steps"], ["gallery", "Photos are ready"]]) {
+    const t = { ...DEFAULTS[kind], ...(crm.savedTemplate(kind) || {}) };
+    const inputs = {
+      subject: h("input", { maxlength: "200", value: t.subject }),
+      eyebrow: h("input", { maxlength: "60", value: t.eyebrow }),
+      heading: h("input", { maxlength: "120", value: t.heading }),
+      message: h("textarea", { rows: "6", maxlength: "10000" }, t.message),
+      stepsTitle: h("input", { maxlength: "60", value: t.stepsTitle }),
+      steps: h("textarea", { rows: "5", maxlength: "5000" }, t.steps),
+      sign: h("textarea", { rows: "2", maxlength: "500" }, t.sign),
+    };
+    const save = h("button", { type: "button", class: "btn btn-primary small", onclick: async () => {
+      save.disabled = true;
+      try {
+        await crm.setTemplate(kind, Object.fromEntries(FIELDS.map((k) => [k, inputs[k].value])));
+        toast(`Saved. New "${title}" emails start with this.`);
+      } catch (e) { if (!(e instanceof Locked)) toast(e.message, true); }
+      finally { save.disabled = false; }
+    } }, "Save");
+    const reset = h("button", { type: "button", class: "btn btn-line small", onclick: async () => {
+      if (!confirm(`Go back to the original wording for "${title}"?`)) return;
+      try {
+        await crm.setTemplate(kind, null);
+        for (const k of FIELDS) inputs[k].value = DEFAULTS[kind][k];
+        toast("Back to the original wording.");
+      } catch (e) { if (!(e instanceof Locked)) toast(e.message, true); }
+    } }, "Original wording");
+    panel.append(h("details", { class: "wording", open: kind === "thanks" }, h("summary", {}, title),
+      field("Subject", inputs.subject),
+      h("div", { class: "pair" }, field("Small heading", inputs.eyebrow), field("Big heading", inputs.heading)),
+      field("Message", inputs.message, "A blank line starts a new paragraph."),
+      kind === "thanks" ? [field("Steps heading", inputs.stepsTitle), field("Next steps", inputs.steps, "One step per line.")] : null,
+      field("Sign-off", inputs.sign),
+      h("div", { class: "row" }, save, reset)));
+  }
+  return panel;
 }

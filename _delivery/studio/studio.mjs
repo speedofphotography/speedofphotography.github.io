@@ -703,7 +703,7 @@ listen(Number(process.env.PORT || 4417));
 
 // ---------- emails to clients ----------
 const previews = new Map();
-const KINDS = ["gallery", "booking", "message"];
+const KINDS = ["gallery", "thanks", "booking", "message"];
 const longDay = (iso) => (/^\d{4}-\d{2}-\d{2}$/.test(iso || "")
   ? new Date(`${iso}T12:00`).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" }) : "");
 
@@ -746,6 +746,10 @@ async function composeMail(b, forPreview) {
         }
       }
     }
+  } else if (kind === "thanks") {
+    // Thanks for the shoot, and what happens next: one step per line.
+    const items = String(b.steps || "").split(/\r?\n/).map((x) => x.trim()).filter(Boolean).slice(0, 12).map((x) => x.slice(0, 400));
+    mail.steps = { title: text(b.stepsTitle, 60) || "Next steps", items };
   } else if (kind === "booking" && shoot) {
     if (shoot.date) mail.highlight = ["Shoot day", `${longDay(shoot.date)}${shoot.time ? ` · ${shoot.time}` : ""}`];
     // The date and time are in the blue box already.

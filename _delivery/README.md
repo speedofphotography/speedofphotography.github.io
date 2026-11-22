@@ -29,6 +29,10 @@ gallery, how to open it, a cover photo), shoot booked (date, time, place) or a p
 look (`_delivery/studio/mailer.mjs`). Sending uses SMTP to smtp.gmail.com (`smtp.mjs`), so copies land in Gmail's
 Sent folder, and each email sent is noted on the client in your records.
 
+Each gallery's page has the two emails for that client: "Thank you + next steps" (a numbered next-steps box) and
+"Photos are ready". Each shows when it was last sent. Their starting wording is yours to set in Settings > Email
+wording ({name}, {car} and {from} are filled in), and can still be changed before each send.
+
 ## How it fits together
 
 ```

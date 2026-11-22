@@ -43,8 +43,22 @@ const highlight = (label, text) => `<table role="presentation" width="100%" cell
     <div style="font-family:${DISPLAY};font-weight:700;font-size:22px;letter-spacing:0.5px;text-transform:uppercase;color:#ffffff;line-height:1.15;">${esc(text)}</div>
   </td></tr></table>`;
 
-// mail: { eyebrow, heading, message, button?, highlight?: [label, text], details?: { title, rows }, cover?: url,
-//         preheader?, signature? }. Returns { html, text }.
+// Numbered steps (what happens next): a dark panel with a blue number beside each step.
+const steps = (title, items) => `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 28px;background:${C.surface};border:1px solid ${C.line};border-left:3px solid ${C.accent};border-radius:4px;">
+  <tr><td style="padding:20px 22px 8px;">
+    ${title ? `<div style="font-family:${DISPLAY};font-weight:700;font-size:18px;letter-spacing:1px;text-transform:uppercase;color:${C.text};margin:0 0 16px;">${esc(title)}</div>` : ""}
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+    ${items.map((t, i) => `<tr>
+      <td width="38" style="width:38px;padding:0 14px 16px 0;vertical-align:top;">
+        <div style="width:28px;height:28px;line-height:28px;text-align:center;background:${C.accent};border-radius:4px;font-family:${DISPLAY};font-weight:700;font-size:16px;color:#ffffff;">${i + 1}</div>
+      </td>
+      <td style="padding:4px 0 16px;vertical-align:top;font-family:${BODY};font-size:16px;line-height:1.5;color:${C.text};">${esc(t)}</td>
+    </tr>`).join("")}
+    </table>
+  </td></tr></table>`;
+
+// mail: { eyebrow, heading, message, button?, highlight?: [label, text], steps?: { title, items }, details?: { title, rows },
+//         cover?: url, preheader?, signature? }. Returns { html, text }.
 export function render(mail) {
   const pre = mail.preheader || "";
   const cover = mail.cover ? `<tr><td style="padding:0 0 30px;">
@@ -78,6 +92,7 @@ export function render(mail) {
     <tr><td>
       ${paragraphs(mail.message)}
       ${mail.highlight ? highlight(...mail.highlight) : ""}
+      ${mail.steps && mail.steps.items.length ? steps(mail.steps.title, mail.steps.items) : ""}
       ${mail.button ? button(mail.button) : ""}
       ${mail.details && mail.details.rows.length ? details(mail.details.title, mail.details.rows) : ""}
       ${mail.signature ? `<p style="margin:0 0 6px;font-family:${BODY};font-size:16px;line-height:1.6;color:${C.text};">${esc(mail.signature).replace(/\n/g, "<br>")}</p>` : ""}
@@ -100,6 +115,11 @@ export function render(mail) {
   // The plain version, for email apps that don't show HTML (and for spam filters, which like having both).
   const lines = [mail.heading.toUpperCase(), "", String(mail.message || "").trim(), ""];
   if (mail.highlight) lines.push(`${mail.highlight[0]}: ${mail.highlight[1]}`, "");
+  if (mail.steps && mail.steps.items.length) {
+    if (mail.steps.title) lines.push(mail.steps.title.toUpperCase());
+    mail.steps.items.forEach((t, i) => lines.push(`${i + 1}. ${t}`));
+    lines.push("");
+  }
   if (mail.button) lines.push(`${mail.button.label}: ${mail.button.url}`, "");
   if (mail.details && mail.details.rows.length) {
     if (mail.details.title) lines.push(mail.details.title.toUpperCase());
