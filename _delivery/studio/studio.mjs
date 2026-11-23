@@ -520,8 +520,10 @@ const api = {
     if (!state.mail) return fail(res, 409, "Set up sending in Settings first.");
     const b = await readJson(req);
     const mail = await composeMail(b, false);
-    const to = await smtp.send(state.mail, { to: mail.to, subject: mail.subject, html: mail.html, text: mail.text, inline: mail.inline });
-    send(res, 200, { to, subject: mail.subject });
+    // One copy per person (see smtp.mjs).
+    const { sent, failed } = await smtp.send(state.mail, { to: mail.to, subject: mail.subject, html: mail.html, text: mail.text, inline: mail.inline });
+    if (!sent.length) return fail(res, 502, `Gmail didn't accept it: ${failed[0]?.error || "unknown error"}`);
+    send(res, 200, { to: sent, failed, subject: mail.subject });
   },
 
   async mailTest(req, res) {
@@ -531,7 +533,8 @@ const api = {
       message: "This is a test from SOP Studio. Emails to clients look like this, in the website's colours.\n\nReplies come back to this inbox.",
       highlight: ["Sent from", state.mail.address], button: { label: "Visit the website", url: SITE + "/" },
     });
-    await smtp.send(state.mail, { to: [state.mail.address], subject: "Test email from SOP Studio", html, text: plain });
+    const { sent, failed } = await smtp.send(state.mail, { to: [state.mail.address], subject: "Test email from SOP Studio", html, text: plain });
+    if (!sent.length) return fail(res, 502, `Gmail didn't accept it: ${failed[0]?.error || "unknown error"}`);
     send(res, 200, { to: state.mail.address });
   },
 

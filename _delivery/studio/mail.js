@@ -207,13 +207,18 @@ export async function composeScreen(q) {
     const d = draft();
     if (!d.to.length) { err.textContent = "Pick who it goes to."; err.hidden = false; return; }
     if (d.kind === "thanks" && !line.value.trim()) { err.textContent = "Write your line about the shoot first."; err.hidden = false; line.focus(); return; }
-    if (!confirm(`Send "${d.subject}" to ${d.to.join(", ")}?`)) return;
+    const many = new Set(d.to).size > 1;
+    if (!confirm(many ? `Send "${d.subject}" to ${new Set(d.to).size} people? Each gets their own copy, with only their address on it.`
+      : `Send "${d.subject}" to ${d.to[0]}?`)) return;
     sendBtn.disabled = true;
     sendBtn.textContent = "Sending…";
     try {
       const r = await api("POST", "/api/mail/send", d);
-      await crm.logEmail(c.id, d.shootId, `Sent "${r.subject}" to ${r.to.join(", ")}.`, d.kind).catch(() => {});
-      toast(`Sent to ${r.to.join(", ")}. It's in your Gmail Sent folder too.`);
+      const missed = (r.failed || []).map((f) => f.to);
+      await crm.logEmail(c.id, d.shootId, `Sent "${r.subject}" to ${r.to.join(", ")}${r.to.length > 1 ? " (each their own copy)" : ""}.` +
+        (missed.length ? ` Didn't go through: ${missed.join(", ")}.` : ""), d.kind).catch(() => {});
+      if (missed.length) toast(`Sent to ${r.to.length} of ${r.to.length + missed.length}. Gmail refused ${missed.join(", ")}: check the address.`, true);
+      else toast(r.to.length > 1 ? `Sent: ${r.to.length} copies, one per person. They're in your Gmail Sent folder too.` : `Sent to ${r.to[0]}. It's in your Gmail Sent folder too.`);
       go(backTo);
     } catch (ex) {
       sendBtn.disabled = false;

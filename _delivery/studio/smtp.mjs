@@ -126,18 +126,38 @@ async function session(cfg, user, pass, work) {
 // Signs in and out again: checks the address and app password without sending anything.
 export const checkLogin = (mail) => session(server(), mail.address, mail.appPassword);
 
+// Each person gets their own copy, with only their address in "To": one email to many visible addresses looks
+// like a mass mailing to spam filters, and clients in a group shouldn't see each other's addresses. All copies go
+// over one connection. Returns { sent, failed: [{ to, error }] }; a copy the mail server refuses doesn't stop the
+// others.
 export async function send(mail, { to, subject, html, text, inline }) {
   const list = [...new Set(to.map((x) => String(x).trim().toLowerCase()))];
   if (!list.length || list.some((x) => !EMAIL_RE.test(x))) throw Object.assign(new Error("Check the email addresses."), { status: 400 });
-  const message = buildMessage({ from: mail.address, fromName: mail.fromName || "Speed Of Photography", to: list, subject, html, text, inline });
-  await session(server(), mail.address, mail.appPassword, async (talk, sock) => {
-    await talk(`MAIL FROM:<${mail.address}>`, [250]);
-    for (const r of list) await talk(`RCPT TO:<${r}>`, [250, 251]);
-    await talk("DATA", [354]);
-    // A line that starts with "." gets a second one, so it can't end the message early.
-    const p = talk(null, [250]);
-    sock.write(`${message.replace(/\r\n\./g, "\r\n..")}\r\n.\r\n`);
-    await p;
-  });
-  return list;
+  const sent = [], failed = [];
+  try {
+    await session(server(), mail.address, mail.appPassword, async (talk, sock) => {
+      for (const r of list) {
+        const message = buildMessage({ from: mail.address, fromName: mail.fromName || "Speed Of Photography", to: [r], subject, html, text, inline });
+        try {
+          await talk(`MAIL FROM:<${mail.address}>`, [250]);
+          await talk(`RCPT TO:<${r}>`, [250, 251]);
+          await talk("DATA", [354]);
+          // A line that starts with "." gets a second one, so it can't end the message early.
+          const p = talk(null, [250]);
+          sock.write(`${message.replace(/\r\n\./g, "\r\n..")}\r\n.\r\n`);
+          await p;
+          sent.push(r);
+        } catch (e) {
+          if (!e.smtp) throw e; // the connection itself failed: stop here
+          failed.push({ to: r, error: e.message });
+          await talk("RSET", [250]).catch(() => {});
+        }
+      }
+    });
+  } catch (e) {
+    // Some copies may already be on their way; say which, so nobody gets sent a second one by mistake.
+    if (sent.length) e.message = `Sent to ${sent.join(", ")}, then sending stopped: ${e.message}`;
+    throw e;
+  }
+  return { sent, failed };
 }
