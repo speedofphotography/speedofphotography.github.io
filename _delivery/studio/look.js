@@ -5,7 +5,8 @@ import { h, api, toast, Locked, enc, fileUrl } from "./ui.js";
 
 const GL = window.GalleryLayouts;
 const SAMPLE = [1.5, 0.67, 1.5, 1.5, 1.78, 0.75, 1.5, 1.33, 1.5];
-const TALL_SAMPLE = [0.67, 0.8, 0.67, 0.75, 0.67, 0.67, 0.8, 0.67, 0.75, 0.67, 0.67, 0.8];
+// Mostly tall photos with some wide ones, the kind of set the portrait-first layouts are for.
+const TALL_SAMPLE = [0.67, 0.8, 1.5, 0.67, 0.67, 0.75, 1.5, 0.67, 0.8, 0.67, 1.5, 0.67];
 const PHONE = 358; // a phone screen's width, less the page's side margins
 const byName = (a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" });
 
