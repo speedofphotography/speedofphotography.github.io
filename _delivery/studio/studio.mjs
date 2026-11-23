@@ -22,7 +22,8 @@ const repo = path.resolve(here, "..", "..");
 // Installed (install-studio.ps1), the app carries its own copy of the site's gallery rules and logo;
 // run from the website folder, it uses the originals.
 const installed = fs.existsSync(path.join(here, "lib", "delivery.js"));
-const { CODE_RE, META_FILE, typeOf, kindOf, isClientFile, readMeta, isExpired, makeLock, makeEmailLock, emailList, cleanPassword, cleanLook, arrange } =
+const { CODE_RE, META_FILE, typeOf, kindOf, isClientFile, readMeta, isExpired, makeLock, makeEmailLock, emailList, cleanPassword, cleanLook, arrange,
+  MASTER_KEY, MASTER_MIN, EMAIL_RE } =
   await import(installed ? "./lib/delivery.js" : "../../_functions_lib/delivery.js");
 const SITE = "https://speedofphotography.com";
 const smtp = await import("./smtp.mjs");
@@ -31,6 +32,20 @@ const IDLE_MS = 30 * 60 * 1000;
 const MAX_FILE = 4.9 * 1024 ** 3; // R2's limit for a single upload is 5 GB
 const MAX_THUMB = 2 * 1024 * 1024;
 const THUMBS = ".thumbs"; // small previews for this app only; the client page never lists sub-folders
+// The cover photo for emails, 1200px wide (portrait photos cropped to 4:5), one per photo used as a cover.
+const EMAILS = ".email";
+const MAX_COVER = 4 * 1024 * 1024;
+// Email covers already read from R2 (or known to be missing: null), so the live preview doesn't fetch them on
+// every keystroke. Up to 30, oldest dropped first.
+const covers = new Map();
+async function emailCover(code, name) {
+  const k = `${code}/${name}`;
+  if (!covers.has(k)) {
+    covers.set(k, await state.r2.getBuffer(`${code}/${EMAILS}/${name}.jpg`));
+    while (covers.size > 30) covers.delete(covers.keys().next().value);
+  }
+  return covers.get(k);
+}
 const ARGS = new Set(process.argv.slice(2));
 
 const state = { r2: null, crm: null, inboxKey: "", bucket: "", session: "", seen: 0, fails: 0, lockUntil: 0, checking: false };
@@ -390,6 +405,26 @@ const api = {
     send(res, 200, { rev: saved.rev, backup: state.crm.backup });
   },
 
+  // The master password: opens every locked gallery on the website (see readMaster in delivery.js). Only its
+  // salted hash goes to the bucket. Changing or removing it needs this app's passphrase too.
+  async masterState(req, res) {
+    send(res, 200, { set: !!(await state.r2.getBuffer(MASTER_KEY)), min: MASTER_MIN });
+  },
+  async masterSet(req, res) {
+    const b = await readJson(req);
+    if (!(typeof b.passphrase === "string" && b.passphrase && await vault.open(b.passphrase))) return fail(res, 401, "That passphrase isn't right.");
+    if (b.remove === true) {
+      await state.r2.del(MASTER_KEY);
+      return send(res, 200, { set: false });
+    }
+    const pw = cleanPassword(b.password);
+    if (pw.length < MASTER_MIN) return fail(res, 400, `Use at least ${MASTER_MIN} characters.`);
+    if (pw.length > 200) return fail(res, 400, "That's too long.");
+    if (EMAIL_RE.test(pw.toLowerCase())) return fail(res, 400, "Use a password, not an email address.");
+    await state.r2.put(MASTER_KEY, Buffer.from(JSON.stringify(await makeLock(pw))), "application/json");
+    send(res, 200, { set: true });
+  },
+
   async listAlbums(req, res) {
     const { prefixes } = await state.r2.listAll("", "/");
     const codes = prefixes.map((p) => p.slice(0, -1)).filter((c) => CODE_RE.test(c));
@@ -503,11 +538,11 @@ const api = {
   },
 
   async mailPreview(req, res) {
-    const { html } = await composeMail(await readJson(req), true);
+    const { html, needsCover } = await composeMail(await readJson(req), true);
     const id = crypto.randomBytes(12).toString("hex");
     previews.set(id, html);
     while (previews.size > 20) previews.delete(previews.keys().next().value);
-    send(res, 200, { url: `/api/mail/preview/${id}` });
+    send(res, 200, { url: `/api/mail/preview/${id}`, needsCover });
   },
   async mailPreviewPage(req, res, id) {
     const html = previews.get(id);
@@ -549,6 +584,11 @@ const api = {
     if (!Number.isFinite(length) || length <= 0) return fail(res, 411, "Empty file.");
     if (length > MAX_FILE) return fail(res, 413, "Files over 5 GB can't be uploaded in one go.");
     await state.r2.putStream(`${code}/${name}`, req, length, typeOf(name));
+    // A replaced photo needs a new email cover; the old one would show the old photo.
+    if (covers.get(`${code}/${name}`) !== null) {
+      covers.delete(`${code}/${name}`);
+      await state.r2.del(`${code}/${EMAILS}/${name}.jpg`);
+    }
     send(res, 200, { ok: true });
   },
 
@@ -571,8 +611,23 @@ const api = {
     res.on("close", () => up.destroy());
   },
 
+  async uploadCover(req, res, code, name) {
+    const body = await readBody(req, MAX_COVER);
+    if (body.length < 3 || body[0] !== 0xff || body[1] !== 0xd8) return fail(res, 400, "Covers must be JPEG.");
+    await state.r2.put(`${code}/${EMAILS}/${name}.jpg`, body, "image/jpeg");
+    covers.set(`${code}/${name}`, body);
+    send(res, 200, { ok: true });
+  },
+  async getCover(req, res, code, name) {
+    const data = await emailCover(code, name);
+    if (!data) return fail(res, 404, "No email cover yet.");
+    res.writeHead(200, { ...SECURITY, "content-type": "image/jpeg", "cache-control": "no-store", "content-length": data.length });
+    res.end(data);
+  },
+
   async deleteFile(req, res, code, name) {
-    await Promise.all([state.r2.del(`${code}/${name}`), state.r2.del(`${code}/${THUMBS}/${name}.jpg`)]);
+    covers.delete(`${code}/${name}`);
+    await Promise.all([state.r2.del(`${code}/${name}`), state.r2.del(`${code}/${THUMBS}/${name}.jpg`), state.r2.del(`${code}/${EMAILS}/${name}.jpg`)]);
     send(res, 200, { ok: true });
   },
 };
@@ -617,6 +672,8 @@ async function route(req, res, url) {
   if (pathname === "/api/inbox/done" && m === "POST") return api.inboxDone(req, res);
   if (pathname === "/api/crm" && m === "GET") return api.getCrm(req, res);
   if (pathname === "/api/crm" && m === "PUT") return api.saveCrm(req, res);
+  if (pathname === "/api/master" && m === "GET") return api.masterState(req, res);
+  if (pathname === "/api/master" && m === "PUT") return api.masterSet(req, res);
   if (pathname === "/api/mail" && m === "GET") return api.mailState(req, res);
   if (pathname === "/api/mail/settings" && m === "PUT") return api.mailSettings(req, res);
   if (pathname === "/api/mail/preview" && m === "POST") return api.mailPreview(req, res);
@@ -627,7 +684,7 @@ async function route(req, res, url) {
   if (pathname === "/api/albums" && m === "GET") return api.listAlbums(req, res);
   if (pathname === "/api/albums" && m === "POST") return api.createAlbum(req, res);
 
-  const a = /^\/api\/albums\/([^/]+)(?:\/(meta|password|look|files|thumbs)(?:\/([^/]+))?)?$/.exec(pathname);
+  const a = /^\/api\/albums\/([^/]+)(?:\/(meta|password|look|files|thumbs|cover)(?:\/([^/]+))?)?$/.exec(pathname);
   if (!a) return fail(res, 404, "Not found.");
   let code, name;
   try { code = decodeURIComponent(a[1]); name = a[3] === undefined ? undefined : decodeURIComponent(a[3]); }
@@ -644,6 +701,8 @@ async function route(req, res, url) {
     if (!okName(name)) return fail(res, 400, "That file name can't be used. Rename it without slashes and try again.");
     if (part === "files" && m === "PUT") return api.upload(req, res, code, name);
     if (part === "thumbs" && m === "PUT") return api.uploadThumb(req, res, code, name);
+    if (part === "cover" && m === "PUT") return api.uploadCover(req, res, code, name);
+    if (part === "cover" && m === "GET") return api.getCover(req, res, code, name);
     if (part === "files" && m === "GET") return api.download(req, res, code, name, url.searchParams.has("thumb"));
     if (part === "files" && m === "DELETE") return api.deleteFile(req, res, code, name);
   }
@@ -726,6 +785,7 @@ async function composeMail(b, forPreview) {
     message: typeof b.message === "string" ? b.message.slice(0, 10000) : "", signature: text(b.signature, 500),
   };
   mail.preview = mail.message; // the inbox preview line: the start of your message, "Hi Alex, thanks for…"
+  let needsCover = null;
   const inline = [];
 
   if (kind === "gallery") {
@@ -740,9 +800,17 @@ async function composeMail(b, forPreview) {
       ["Link", linkFor(code)],
     ].filter(([, v]) => v) };
     if (b.cover !== false) {
-      const first = arrange(files, meta.order).find((f) => f.thumb);
-      if (first) {
-        if (forPreview) mail.cover = `/api/albums/${encodeURIComponent(code)}/files/${encodeURIComponent(first.name)}?thumb=1`;
+      // The first photo in the gallery's order. Its email-sized version (1200px wide, made by the compose screen
+      // from the original) is sharp at the email's full width; until it exists, the small preview stands in.
+      const first = arrange(files, meta.order).find((f) => f.kind === "image");
+      const big = first ? await emailCover(code, first.name) : null;
+      if (first && !big) needsCover = { code, name: first.name };
+      const fileQ = `/api/albums/${encodeURIComponent(code)}/files/${encodeURIComponent(first?.name || "")}`;
+      if (big) {
+        if (forPreview) mail.cover = `/api/albums/${encodeURIComponent(code)}/cover/${encodeURIComponent(first.name)}`;
+        else { inline.push({ cid: "cover@sop", type: "image/jpeg", name: "cover.jpg", data: big }); mail.cover = "cid:cover@sop"; }
+      } else if (first?.thumb) {
+        if (forPreview) mail.cover = `${fileQ}?thumb=1`;
         else {
           const data = await state.r2.getBuffer(`${code}/${THUMBS}/${first.name}.jpg`);
           if (data) { inline.push({ cid: "cover@sop", type: "image/jpeg", name: "cover.jpg", data }); mail.cover = "cid:cover@sop"; }
@@ -761,5 +829,5 @@ async function composeMail(b, forPreview) {
     ].filter(([, v]) => v) };
   }
   const { html, text: plain } = renderMail(mail);
-  return { to, subject, html, text: plain, inline, client };
+  return { to, subject, html, text: plain, inline, client, needsCover };
 }

@@ -423,7 +423,50 @@ async function settingsScreen() {
   lengthSel.value = String(crm.galleryDays());
   const galleries = h("section", { class: "panel narrow" }, h("h2", {}, "Galleries"),
     field("New galleries stay open for", lengthSel, "You can still pick a different length for each gallery, and extend or shorten it later on its page."));
-  show(back("#/", "Today"), h("h1", {}, "Settings"), galleries, await mailSettings(), wordingSettings(), records, pass, keys);
+  show(back("#/", "Today"), h("h1", {}, "Settings"), galleries, await masterSettings(), await mailSettings(), wordingSettings(), records, pass, keys);
+}
+
+// A password of yours that opens every gallery with a password or email lock, typed where the client would
+// type theirs. Only a scrambled (hashed) form is stored, so it can't be shown again: pick one you'll remember.
+async function masterSettings() {
+  let m = { set: false, min: 8 };
+  try { m = await api("GET", "/api/master"); } catch (e) { if (e instanceof Locked) throw e; }
+  const status = h("p", {});
+  const removeBtn = h("button", { type: "button", class: "btn btn-line" }, "Remove master password");
+  const mark = () => {
+    status.textContent = m.set ? "A master password is set. It opens every locked gallery." : "No master password yet.";
+    removeBtn.hidden = !m.set;
+  };
+  const pw = h("input", { name: "password", type: "password", autocomplete: "new-password", minlength: String(m.min), maxlength: "200", required: true });
+  const again = h("input", { name: "again", type: "password", autocomplete: "new-password", required: true });
+  const passphrase = h("input", { name: "passphrase", type: "password", autocomplete: "current-password", required: true });
+  const form = busyForm(h("form", { class: "panel narrow", autocomplete: "off" },
+    h("h2", {}, "Master gallery password"),
+    h("p", { class: "muted" }, "Your own password that opens any gallery, whether it asks for a password or the client's email. Type it where the client types theirs. It's stored scrambled, so it can't be shown again later."),
+    status,
+    field(m.set ? "New master password" : "Master password", pw, `At least ${m.min} characters.`),
+    field("Type it again", again),
+    field("Your passphrase", passphrase, "The one that unlocks this app."),
+    h("div", { class: "row" }, h("button", { type: "submit", class: "btn btn-primary" }, "Save master password"), removeBtn)),
+  async () => {
+    if (pw.value !== again.value) throw new Error("The two passwords don't match.");
+    m = { ...m, ...(await api("PUT", "/api/master", { password: pw.value, passphrase: passphrase.value })) };
+    form.reset();
+    mark();
+    toast("Master password saved. It opens every locked gallery now.");
+  });
+  removeBtn.addEventListener("click", async () => {
+    if (!passphrase.value) { toast("Type your passphrase first.", true); passphrase.focus(); return; }
+    if (!confirm("Remove the master password? Galleries will only open with their own password or the client's email.")) return;
+    try {
+      m = { ...m, ...(await api("PUT", "/api/master", { remove: true, passphrase: passphrase.value })) };
+      form.reset();
+      mark();
+      toast("Master password removed.");
+    } catch (e) { if (!(e instanceof Locked)) toast(e.message, true); }
+  });
+  mark();
+  return form;
 }
 
 // ---------- routing ----------

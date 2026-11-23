@@ -12,6 +12,10 @@ theirs that opens by email. Galleries made earlier with their own password keep 
 client's emails (or remove the password) on the gallery's page in Studio. gallery.json only holds salted hashes,
 never the emails or passwords themselves.
 
+A master password (Studio > Settings > Master gallery password) opens every locked gallery, typed where the client
+types theirs. It's kept in the bucket as a salted hash at `_settings/master.json`, which no gallery address can
+reach. Changing or removing it asks for Studio's passphrase.
+
 Galleries without a password (every gallery made before passwords existed, and any you make with the box
 unticked) open for anyone with the link, so the code at the end of the link is the key. Make it something nobody
 could guess. Studio and `new-gallery.ps1` do this for you.
@@ -26,7 +30,8 @@ It saves by itself into gallery.json as `layout`, `bg` and `order`. The preview 
 Studio also sends emails to clients from your own Gmail (Settings > Sending email: your address plus a Google
 app password, kept in the passphrase-locked vault, never in this repo). "Send email" on a client, "Email client" on
 a shoot and "Email link" on a gallery open a compose screen with a live preview: photos ready (button to the
-gallery, how to open it, a cover photo), shoot booked (date, time, place) or a plain message, all in the site's
+gallery, how to open it, a cover photo made at 1200px from the original the first time and kept in the gallery's
+`.email/` folder), shoot booked (date, time, place) or a plain message, all in the site's
 look (`_delivery/studio/mailer.mjs`). Sending uses SMTP to smtp.gmail.com (`smtp.mjs`), so copies land in Gmail's
 Sent folder, and each email sent is noted on the client in your records.
 

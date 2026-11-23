@@ -209,6 +209,28 @@ export async function passwordOk(lock, password) {
   return match === 1;
 }
 
+// The master password: one password of the photographer's that opens every gallery with a lock, whatever its
+// own password or emails. Kept in the bucket as a lock like any gallery's (salted PBKDF2 hash, never the
+// password itself) under _settings/, which gallery pages can't reach (codes can't start with "_").
+// Studio sets and removes it.
+export const MASTER_KEY = "_settings/master.json";
+export const MASTER_MIN = 8;
+export async function readMaster(bucket) {
+  try {
+    const obj = await bucket.get(MASTER_KEY);
+    if (!obj) return null;
+    const lock = lockOf(JSON.parse(await obj.text()));
+    return lock && !lock.email ? lock : null;
+  } catch { return null; }
+}
+// Does this try open a gallery with this lock? Its own password (or one of its emails) first, then the master
+// password. An email typed at an email gallery is never the master password, so it isn't checked twice.
+export async function unlockOk(lock, password, master) {
+  if (await passwordOk(lock, password)) return true;
+  if (!master || (lock?.email && EMAIL_RE.test(cleanEmail(password)))) return false;
+  return passwordOk(master, password);
+}
+
 const signer = (lock) => crypto.subtle.importKey("raw", fromB64(lock.hash), { name: "HMAC", hash: "SHA-256" }, false, ["sign", "verify"]);
 
 export async function makeKey(lock, code) {

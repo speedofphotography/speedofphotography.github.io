@@ -1,10 +1,11 @@
 // GET  /api/gallery/<code> : the gallery's details and file list, for /g/<code>/.
 // POST /api/gallery/<code> : { password } for a gallery with a password (or the client's email, for a gallery
-//                            opened by email); answers with a key ("k") the page adds
+//                            opened by email, or the photographer's master password, which opens any locked
+//                            gallery); answers with a key ("k") the page adds
 //                            to every gallery address (see Gallery passwords in _functions_lib/delivery.js).
 // Galleries without a password (every gallery made before passwords existed) work exactly as before.
 import {
-  CODE_RE, json, readMeta, isExpired, isClientFile, kindOf, allowed, passwordOk, makeKey, arrange,
+  CODE_RE, json, readMeta, isExpired, isClientFile, kindOf, allowed, unlockOk, readMaster, makeKey, arrange,
 } from "../../../_functions_lib/delivery.js";
 
 // Wrong passwords per gallery, from anywhere, before it stops checking for an hour. (Each address is also
@@ -76,7 +77,7 @@ export async function onRequestPost({ request, params, env }) {
   } catch { /* start counting again */ }
   if (tries.count >= MAX_TRIES) return json({ error: "too_many" }, 429);
 
-  if (!(await passwordOk(meta.lock, password))) {
+  if (!(await unlockOk(meta.lock, password, await readMaster(bucket)))) {
     tries.count += 1;
     await bucket.put(triesKey, JSON.stringify(tries), { httpMetadata: { contentType: "application/json" } });
     return json({ error: "wrong_password" }, 401);

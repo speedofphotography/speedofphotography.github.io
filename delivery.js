@@ -125,7 +125,7 @@ function askPassword() {
   const input = els.unlock.password;
   if (ask === "email") {
     els.unlockLabel.textContent = "Enter your email address to open your photos (the one you booked with).";
-    input.type = "email";
+    input.type = "text"; // not "email": the master password works here too
     input.autocomplete = "email";
     input.inputMode = "email";
   }

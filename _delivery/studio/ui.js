@@ -141,3 +141,22 @@ export async function makeThumb(file) {
   } catch { return null; }
 }
 export const THUMB_SIDE = 1200;
+
+// The cover photo for emails: 1200px wide so it's sharp at the email's full width on any screen. Portrait photos
+// are cropped to 4:5 from the middle so the email doesn't become one very tall picture.
+export async function makeEmailCover(file) {
+  try {
+    const bmp = await createImageBitmap(file, { imageOrientation: "from-image" });
+    let sw = bmp.width, sh = bmp.height, sx = 0, sy = 0;
+    if (sh > sw * 1.25) { sh = Math.round(sw * 1.25); sy = Math.round((bmp.height - sh) / 2); }
+    const w = Math.min(1200, sw), hgt = Math.round((w * sh) / sw);
+    const c = document.createElement("canvas");
+    c.width = w;
+    c.height = hgt;
+    const g = c.getContext("2d");
+    g.imageSmoothingQuality = "high";
+    g.drawImage(bmp, sx, sy, sw, sh, 0, 0, w, hgt);
+    bmp.close();
+    return await new Promise((r) => c.toBlob(r, "image/jpeg", 0.86));
+  } catch { return null; }
+}

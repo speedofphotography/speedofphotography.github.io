@@ -1,6 +1,6 @@
 // SOP Studio: write an email to a client and send it from your Gmail, in the website's look. The preview beside
 // the form is the real email (made by mailer.mjs), so what you see is what they get.
-import { h, show, toast, api, Locked, field, select, back, go } from "./ui.js";
+import { h, show, toast, api, Locked, field, select, back, go, enc, makeEmailCover } from "./ui.js";
 import * as crm from "./crm.js";
 
 const TYPES = [["gallery", "Photos are ready (gallery link)"], ["thanks", "Thank you + next steps"], ["booking", "Shoot booked (date, time, place)"], ["message", "Message"]];
@@ -160,10 +160,33 @@ export async function composeScreen(q) {
     timer = setTimeout(async () => {
       const mine = ++seq;
       try {
-        const { url } = await api("POST", "/api/mail/preview", draft());
+        const { url, needsCover } = await api("POST", "/api/mail/preview", draft());
         if (mine === seq) { frame.src = url; previewErr.hidden = true; }
+        if (needsCover) makeCover(needsCover);
       } catch (e) { if (!(e instanceof Locked) && mine === seq) { previewErr.textContent = e.message; previewErr.hidden = false; } }
     }, 350);
+  }
+  // The email's cover photo, made once from the original at email size (sharp, unlike the small preview).
+  // Until it's ready the small preview stands in; the preview refreshes when it is.
+  const coverTried = new Set();
+  let coverBusy = null;
+  async function makeCover({ code, name }) {
+    const k = `${code}/${name}`;
+    if (coverTried.has(k)) return;
+    coverTried.add(k);
+    coverBusy = (async () => {
+      try {
+        const got = await fetch(`/api/albums/${enc(code)}/files/${enc(name)}`, { credentials: "same-origin" });
+        if (!got.ok) return;
+        const jpg = await makeEmailCover(await got.blob());
+        if (!jpg) return;
+        const put = await fetch(`/api/albums/${enc(code)}/cover/${enc(name)}`, {
+          method: "PUT", headers: { "x-studio": "1", "content-type": "image/jpeg" }, body: jpg, credentials: "same-origin" });
+        if (put.ok) refresh();
+      } catch { /* the small preview stays the cover */ }
+    })();
+    await coverBusy;
+    coverBusy = null;
   }
   for (const el of [subject, eyebrow, heading, message, sign, buttonLabel, stepsTitle, steps, line]) el.addEventListener("input", refresh);
   cover.addEventListener("change", refresh);
@@ -213,6 +236,7 @@ export async function composeScreen(q) {
     sendBtn.disabled = true;
     sendBtn.textContent = "Sending…";
     try {
+      if (coverBusy) await coverBusy; // the sharp cover photo is still being made
       const r = await api("POST", "/api/mail/send", d);
       const missed = (r.failed || []).map((f) => f.to);
       await crm.logEmail(c.id, d.shootId, `Sent "${r.subject}" to ${r.to.join(", ")}${r.to.length > 1 ? " (each their own copy)" : ""}.` +
