@@ -5,6 +5,7 @@ import { h, api, toast, Locked, enc, fileUrl } from "./ui.js";
 
 const GL = window.GalleryLayouts;
 const SAMPLE = [1.5, 0.67, 1.5, 1.5, 1.78, 0.75, 1.5, 1.33, 1.5];
+const TALL_SAMPLE = [0.67, 0.8, 0.67, 0.75, 0.67, 0.67, 0.8, 0.67, 0.75, 0.67, 0.67, 0.8];
 const PHONE = 358; // a phone screen's width, less the page's side margins
 const byName = (a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" });
 
@@ -18,9 +19,9 @@ function arranged(names, order) {
 
 // A small picture of a layout: the layout itself on a computer-sized page with sample photos, shrunk down.
 const MINI = 150 / 1000;
-function miniature(id) {
+function miniature(L) {
   const box = h("div", { class: "mini", "aria-hidden": "true" });
-  const res = GL.compute(id, 1000, SAMPLE, { viewH: 640 });
+  const res = GL.compute(L.id, 1000, L.portrait ? TALL_SAMPLE : SAMPLE, { viewH: 640 });
   for (const b of res.mats || []) box.append(cell(b, "mini-mat"));
   res.rects.forEach((b, i) => box.append(cell(b, i === 0 ? "mini-photo first" : "mini-photo")));
   return box;
@@ -66,17 +67,18 @@ export function lookPanel(code, album) {
   }
 
   // ----- layouts -----
-  const picks = h("div", { class: "layout-picks", role: "group", "aria-label": "Layout" });
+  const picks = h("div", { class: "layout-picks", role: "group", "aria-label": "Layouts" });
+  const tallPicks = h("div", { class: "layout-picks", role: "group", "aria-label": "Layouts for portrait photos" });
   const pickButtons = GL.LAYOUTS.map((L) => {
     const b = h("button", { type: "button", class: "layout-pick", "aria-pressed": String(L.id === state.layout), onclick: () => {
       state.layout = L.id;
       pickButtons.forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
       draw();
       save();
-    } }, miniature(L.id), h("strong", {}, L.name), h("small", {}, L.about));
+    } }, miniature(L), h("strong", {}, L.name), h("small", {}, L.about));
+    (L.portrait ? tallPicks : picks).append(b);
     return b;
   });
-  picks.append(...pickButtons);
 
   // ----- background colour -----
   const custom = h("input", { type: "color", "aria-label": "Any colour", value: state.bg || "#0b0b0c" });
@@ -229,6 +231,9 @@ export function lookPanel(code, album) {
     h("p", { class: "muted" }, "How the client's gallery page looks. Changes save by themselves."),
     h("h3", {}, "Layout"),
     picks,
+    h("h3", {}, "Layouts for portrait photos"),
+    h("p", { class: "muted small" }, "Made for tall photos. Landscape photos still show; Portrait grid and Tall magazine crop them to tall."),
+    tallPicks,
     h("h3", {}, "Background"),
     h("div", { class: "swatches" }, ...swatches, h("label", { class: "swatch custom" }, custom, h("small", {}, "Any colour"))),
     hexLine,

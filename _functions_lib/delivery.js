@@ -92,7 +92,8 @@ export async function readMeta(bucket, code) {
 // ---------- Layouts ----------
 // Chosen in SOP Studio. The page draws them with /gallery-layouts.js, which has the same list of ids.
 export const LAYOUTS = ["masonry", "grid", "rows", "feature", "column", "pairs", "mosaic", "alternate",
-  "widescreen", "filmstrip", "slideshow", "framed"];
+  "widescreen", "filmstrip", "slideshow", "framed", "portrait-grid", "portrait-rows", "portrait-spotlight",
+  "portrait-threes", "portrait-pairs", "portrait-magazine"];
 const HEX = /^#[0-9a-fA-F]{6}$/;
 const MAX_ORDER = 5000;
 

@@ -44,6 +44,48 @@ function cells(W, list, C, cellRatio, blockRows, pattern) {
   return { rects, height: bottom };
 }
 
+// Rows of even height, every photo uncropped: photos go into a row until it would be wider than the page at the
+// target height, then the row is scaled to fill the width exactly.
+function justified(W, r, target) {
+  const G = gapFor(W);
+  const rects = [];
+  let y = 0, row = [];
+  const flush = (last) => {
+    if (!row.length) return;
+    const sum = row.reduce((s, i) => s + r[i], 0);
+    let h = (W - G * (row.length - 1)) / sum;
+    if (last && h > target) h = target; // a short last row keeps the usual height instead of blowing up
+    let x = 0;
+    for (const i of row) { rects[i] = { x, y, w: r[i] * h, h }; x += r[i] * h + G; }
+    y += h + G;
+    row = [];
+  };
+  r.forEach((ratio, i) => {
+    row.push(i);
+    const width = row.reduce((s, j) => s + r[j] * target, 0) + G * (row.length - 1);
+    if (width >= W) flush(false);
+  });
+  flush(true);
+  return { rects, height: Math.max(0, y - G) };
+}
+
+// A set number of photos to a row, all the same height and uncropped, each row filling the width. A short last
+// row keeps the height a full row of tall photos would have, centred.
+function perRow(W, r, C) {
+  const G = gapFor(W);
+  const rects = [];
+  let y = 0;
+  for (let i = 0; i < r.length; i += C) {
+    const row = r.slice(i, i + C);
+    let h = (W - G * (row.length - 1)) / row.reduce((s, x) => s + x, 0);
+    if (row.length < C) h = Math.min(h, (W - G * (C - 1)) / (C * 0.67));
+    let x = (W - (row.reduce((s, ratio) => s + ratio * h, 0) + G * (row.length - 1))) / 2;
+    row.forEach((ratio, j) => { rects[i + j] = { x, y, w: ratio * h, h }; x += ratio * h + G; });
+    y += h + G;
+  }
+  return { rects, height: Math.max(0, y - G) };
+}
+
 // A photo shown whole inside a box, centred.
 function inside(box, r) {
   const w = Math.min(box.w, box.h * r);
@@ -65,29 +107,7 @@ const LAYOUTS = [
     } },
 
   { id: "rows", name: "Justified rows", about: "Rows of even height, every photo uncropped.",
-    fn(W, r) {
-      const G = gapFor(W);
-      const target = W >= 900 ? 300 : W >= 560 ? 220 : 150;
-      const rects = [];
-      let y = 0, row = [];
-      const flush = (last) => {
-        if (!row.length) return;
-        const sum = row.reduce((s, i) => s + r[i], 0);
-        let h = (W - G * (row.length - 1)) / sum;
-        if (last && h > target) h = target; // a short last row keeps the usual height instead of blowing up
-        let x = 0;
-        for (const i of row) { rects[i] = { x, y, w: r[i] * h, h }; x += r[i] * h + G; }
-        y += h + G;
-        row = [];
-      };
-      r.forEach((ratio, i) => {
-        row.push(i);
-        const width = row.reduce((s, j) => s + r[j] * target, 0) + G * (row.length - 1);
-        if (width >= W) flush(false);
-      });
-      flush(true);
-      return { rects, height: Math.max(0, y - G) };
-    } },
+    fn: (W, r) => justified(W, r, W >= 900 ? 300 : W >= 560 ? 220 : 150) },
 
   { id: "feature", name: "Cover photo", about: "Spot 1 runs full width, the rest staggered below.",
     fn(W, r, o) {
@@ -201,6 +221,74 @@ const LAYOUTS = [
         return inside({ x: frame.x + pad, y: frame.y + pad, w: u - pad * 2, h: u - pad * 2 }, ratio);
       });
       return { rects, mats, height: r.length ? Math.ceil(r.length / C) * (u + G) - G : 0 };
+    } },
+
+  // ----- Made for portrait (tall) photos. Landscape photos still fit; the cropped ones crop them to tall. -----
+  { id: "portrait-grid", name: "Portrait grid", about: "Tall 4:5 tiles in tidy rows.", portrait: true,
+    fn(W, r) {
+      const C = W >= 1000 ? 4 : W >= 640 ? 3 : 2;
+      const G = gapFor(W);
+      const w = (W - G * (C - 1)) / C;
+      const h = w * 1.25;
+      const rects = r.map((_, i) => ({ x: (i % C) * (w + G), y: Math.floor(i / C) * (h + G), w, h }));
+      return { rects, height: r.length ? Math.ceil(r.length / C) * (h + G) - G : 0 };
+    } },
+
+  { id: "portrait-rows", name: "Tall rows", about: "Rows of tall photos, every photo uncropped; mixed shapes fit together.", portrait: true,
+    fn: (W, r) => justified(W, r, W >= 900 ? 480 : W >= 560 ? 360 : 300) },
+
+  { id: "portrait-spotlight", name: "Spotlight", about: "One big tall photo, then three across, repeating.", portrait: true,
+    fn(W, r, o) {
+      const G = gapFor(W);
+      const cap = o.viewH ? Math.max(o.viewH * 0.88, 360) : W * 0.75;
+      const C = W < 560 ? 2 : 3;
+      const rects = [];
+      let y = 0, i = 0;
+      while (i < r.length) {
+        const h = Math.min(W / r[i], cap);
+        rects[i] = { x: (W - r[i] * h) / 2, y, w: r[i] * h, h };
+        y += h + G;
+        i++;
+        const row = perRow(W, r.slice(i, i + C), C);
+        row.rects.forEach((b, j) => { rects[i + j] = { ...b, y: b.y + y }; });
+        if (row.rects.length) y += row.height + G;
+        i += row.rects.length;
+      }
+      return { rects, height: Math.max(0, y - G) };
+    } },
+
+  { id: "portrait-threes", name: "Threes", about: "Three photos to a row, same height, uncropped.", portrait: true,
+    fn: (W, r) => perRow(W, r, W < 560 ? 2 : 3) },
+
+  { id: "portrait-pairs", name: "Portrait pairs", about: "Two tall photos side by side, sized to fit the screen.", portrait: true,
+    fn(W, r, o) {
+      const G = W < 720 ? 12 : 20;
+      const cap = o.viewH ? Math.max(o.viewH * 0.88, 360) : W * 0.75;
+      const C = W < 480 ? 1 : 2;
+      const rects = [];
+      let y = 0;
+      for (let i = 0; i < r.length; i += C) {
+        const row = r.slice(i, i + C);
+        const h = Math.min((W - G * (row.length - 1)) / row.reduce((s, x) => s + x, 0), cap);
+        let x = (W - (row.reduce((s, ratio) => s + ratio * h, 0) + G * (row.length - 1))) / 2;
+        row.forEach((ratio, j) => { rects[i + j] = { x, y, w: ratio * h, h }; x += ratio * h + G; });
+        y += h + G;
+      }
+      return { rects, height: Math.max(0, y - G) };
+    } },
+
+  { id: "portrait-magazine", name: "Tall magazine", about: "A big tall photo beside four small ones, swapping sides.", portrait: true,
+    fn(W, r) {
+      if (W < 560) {
+        return cells(W, r, 2, 1.25, 3, () => [
+          { col: 0, row: 0, cols: 2, rows: 2 }, { col: 0, row: 2, cols: 1, rows: 1 }, { col: 1, row: 2, cols: 1, rows: 1 }]);
+      }
+      return cells(W, r, 4, 1.25, 2, (b) => {
+        const big = b % 2 === 0 ? 0 : 2, small = b % 2 === 0 ? 2 : 0;
+        return [{ col: big, row: 0, cols: 2, rows: 2 },
+          { col: small, row: 0, cols: 1, rows: 1 }, { col: small + 1, row: 0, cols: 1, rows: 1 },
+          { col: small, row: 1, cols: 1, rows: 1 }, { col: small + 1, row: 1, cols: 1, rows: 1 }];
+      });
     } },
 ];
 const byId = Object.fromEntries(LAYOUTS.map((l) => [l.id, l]));
@@ -317,7 +405,7 @@ function theme(bg) {
 }
 
 root.GalleryLayouts = {
-  LAYOUTS: LAYOUTS.map(({ id, name, about, scroll }) => ({ id, name, about, scroll: !!scroll })),
+  LAYOUTS: LAYOUTS.map(({ id, name, about, scroll, portrait }) => ({ id, name, about, scroll: !!scroll, portrait: !!portrait })),
   DEFAULT, PRESETS, compute, place, arrows, theme,
 };
 })(typeof window !== "undefined" ? window : globalThis);

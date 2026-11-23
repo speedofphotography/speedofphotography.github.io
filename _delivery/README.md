@@ -16,9 +16,10 @@ Galleries without a password (every gallery made before passwords existed, and a
 unticked) open for anyone with the link, so the code at the end of the link is the key. Make it something nobody
 could guess. Studio and `new-gallery.ps1` do this for you.
 
-Each gallery's page in Studio also has a "Layout and colour" panel: twelve layouts (staggered, even grid,
+Each gallery's page in Studio also has a "Layout and colour" panel: eighteen layouts (staggered, even grid,
 justified rows, cover photo, single column, two columns, magazine, wide and pairs, widescreen, filmstrip,
-slideshow, gallery wall), a background colour, and a preview where you drag photos into the spots you want.
+slideshow, gallery wall, plus six made for portrait photos: portrait grid, tall rows, spotlight, threes,
+portrait pairs, tall magazine), a background colour, and a preview where you drag photos into the spots you want.
 It saves by itself into gallery.json as `layout`, `bg` and `order`. The preview and the client's page both use
 `gallery-layouts.js`/`.css` from the site, so they match. Galleries that never set these look as they always did.
 
