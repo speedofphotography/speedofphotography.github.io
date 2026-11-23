@@ -68,7 +68,6 @@ export function lookPanel(code, album) {
 
   // ----- layouts -----
   const picks = h("div", { class: "layout-picks", role: "group", "aria-label": "Layouts" });
-  const tallPicks = h("div", { class: "layout-picks", role: "group", "aria-label": "Layouts for portrait photos" });
   const pickButtons = GL.LAYOUTS.map((L) => {
     const b = h("button", { type: "button", class: "layout-pick", "aria-pressed": String(L.id === state.layout), onclick: () => {
       state.layout = L.id;
@@ -76,7 +75,7 @@ export function lookPanel(code, album) {
       draw();
       save();
     } }, miniature(L), h("strong", {}, L.name), h("small", {}, L.about));
-    (L.portrait ? tallPicks : picks).append(b);
+    picks.append(b);
     return b;
   });
 
@@ -229,11 +228,8 @@ export function lookPanel(code, album) {
   const el = h("section", { class: "panel look" },
     h("div", { class: "head" }, h("h2", {}, "Layout and colour"), status),
     h("p", { class: "muted" }, "How the client's gallery page looks. Changes save by themselves."),
-    h("h3", {}, "Layout"),
+    h("h3", {}, "Layouts"),
     picks,
-    h("h3", {}, "Layouts for portrait photos"),
-    h("p", { class: "muted small" }, "Made for tall photos. Landscape photos still show; Portrait grid and Tall magazine crop them to tall."),
-    tallPicks,
     h("h3", {}, "Background"),
     h("div", { class: "swatches" }, ...swatches, h("label", { class: "swatch custom" }, custom, h("small", {}, "Any colour"))),
     hexLine,
