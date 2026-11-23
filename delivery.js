@@ -52,6 +52,11 @@ const nearScreen = "IntersectionObserver" in window
   : { observe: (el) => el._load() };
 const THUMB = 900;
 const LARGE = 2400;
+// Small tiles get the 900px preview; a tile bigger than that on this screen (big layout spots, phones and
+// sharp "retina" screens) gets the 2400px one the full-screen view uses, so no extra sizes are made.
+// Tall photos fill a box by height, so the larger side counts.
+const previewWidth = (tile) =>
+  (Math.max(tile.offsetWidth, tile.offsetHeight) * (window.devicePixelRatio || 1) > THUMB * 1.15 ? LARGE : THUMB);
 
 const fmtBytes = (n) => {
   const u = ["B", "KB", "MB", "GB", "TB"];
@@ -216,9 +221,12 @@ function buildGrid() {
     tile.setAttribute("role", "button");
     tile.setAttribute("aria-label", `${f.kind === "file" ? "Download" : "View"} ${f.name}`);
     if (f.kind === "image") {
-      tile._load = () => {
+      let width = 0; // the preview size asked for so far
+      const fetchPreview = (w) => {
+        width = w;
         const img = new Image();
         img.onload = () => {
+          if (w < width) return; // a sharper one was asked for meanwhile
           tile.style.setProperty("--img", `url("${img.src}")`);
           tile.dataset.ratio = img.naturalWidth / img.naturalHeight || 1.5;
           tile.classList.add("is-loaded");
@@ -227,10 +235,13 @@ function buildGrid() {
         img.onerror = () => {
           if (!img.src.includes("/cdn-cgi/")) return;
           resize = false; // Cloudflare resizing isn't on: use the original instead
-          img.src = sized(f, THUMB);
+          img.src = sized(f, w);
         };
-        img.src = sized(f, THUMB);
+        img.src = sized(f, w);
       };
+      tile._load = () => fetchPreview(previewWidth(tile));
+      // After the layout changes: a tile that grew past its preview gets the sharper one.
+      tile._sharpen = () => { if (width && previewWidth(tile) > width) fetchPreview(LARGE); };
       nearScreen.observe(tile);
     } else if (f.kind === "video") {
       const v = document.createElement("video");
@@ -285,6 +296,7 @@ function layout() {
   if (!tiles.length || !els.grid.clientWidth) return;
   lastWidth = window.innerWidth;
   GL.place(els.grid, tiles, look.layout, { viewH });
+  for (const t of tiles) if (t._sharpen) t._sharpen();
 }
 
 // ---------- Lightbox ----------

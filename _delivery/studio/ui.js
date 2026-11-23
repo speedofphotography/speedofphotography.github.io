@@ -122,3 +122,22 @@ export function busyForm(form, action) {
 
 export const back = (href, label) => h("p", {}, h("a", { href, class: "back" }, `← ${label}`));
 export const go = (hash) => { location.hash = hash; };
+
+// A JPEG preview for this app (the gallery grid, the layout preview and email covers; the client page makes its
+// own). 1200px on the long side so big layout spots stay sharp. Skipped for files the browser can't draw.
+export async function makeThumb(file) {
+  if (!/^image\/(jpeg|png|webp|gif|avif)$/.test(file.type)) return null;
+  try {
+    const bmp = await createImageBitmap(file, { imageOrientation: "from-image" });
+    const scale = Math.min(1, THUMB_SIDE / Math.max(bmp.width, bmp.height));
+    const c = document.createElement("canvas");
+    c.width = Math.round(bmp.width * scale);
+    c.height = Math.round(bmp.height * scale);
+    const g = c.getContext("2d");
+    g.imageSmoothingQuality = "high";
+    g.drawImage(bmp, 0, 0, c.width, c.height);
+    bmp.close();
+    return await new Promise((r) => c.toBlob(r, "image/jpeg", 0.86));
+  } catch { return null; }
+}
+export const THUMB_SIDE = 1200;

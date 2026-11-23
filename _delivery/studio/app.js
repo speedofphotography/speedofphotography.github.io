@@ -1,6 +1,6 @@
 // SOP Studio page: sign-in, galleries, settings and page routing. Client records live in crm.js.
 // Everything goes through the local app (studio.mjs); this page never sees the R2 keys.
-import { app, info, hooks, h, show, toast, api, Locked, enc, fileUrl, size, day, isoIn, plural, copy, field, busyForm, back, go } from "./ui.js";
+import { app, info, hooks, h, show, toast, api, Locked, enc, fileUrl, size, day, isoIn, plural, copy, field, busyForm, back, go, makeThumb } from "./ui.js";
 import * as crm from "./crm.js";
 import { lookPanel } from "./look.js";
 import { composeScreen, mailSettings, wordingSettings } from "./mail.js";
@@ -379,21 +379,6 @@ async function albumScreen(code) {
         } catch (ex) { e.target.disabled = false; if (!(ex instanceof Locked)) toast(ex.message, true); }
       } }, "Delete this gallery")));
   render();
-}
-
-// A small JPEG preview for this app's grid (the client page makes its own). Skipped for files the browser can't draw.
-async function makeThumb(file) {
-  if (!/^image\/(jpeg|png|webp|gif|avif)$/.test(file.type)) return null;
-  try {
-    const bmp = await createImageBitmap(file, { imageOrientation: "from-image" });
-    const scale = Math.min(1, 480 / Math.max(bmp.width, bmp.height));
-    const c = document.createElement("canvas");
-    c.width = Math.round(bmp.width * scale);
-    c.height = Math.round(bmp.height * scale);
-    c.getContext("2d").drawImage(bmp, 0, 0, c.width, c.height);
-    bmp.close();
-    return await new Promise((r) => c.toBlob(r, "image/jpeg", 0.8));
-  } catch { return null; }
 }
 
 // ---------- settings ----------

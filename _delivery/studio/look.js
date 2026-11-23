@@ -1,7 +1,7 @@
 // SOP Studio: the "Layout and colour" panel on a gallery's page. Pick one of the layouts, a background colour,
 // and drag photos into the spots you want. The preview is drawn by the website's own gallery-layouts.js, so it
 // matches what the client sees. Changes save by themselves.
-import { h, api, toast, Locked, enc, fileUrl } from "./ui.js";
+import { h, api, toast, Locked, enc, fileUrl, makeThumb } from "./ui.js";
 
 const GL = window.GalleryLayouts;
 const SAMPLE = [1.5, 0.67, 1.5, 1.5, 1.78, 0.75, 1.5, 1.33, 1.5];
@@ -131,9 +131,12 @@ export function lookPanel(code, album) {
       const img = new Image();
       img.onload = () => {
         t.dataset.ratio = String(img.naturalWidth / img.naturalHeight || 1.5);
-        t.style.backgroundImage = `url("${src}")`;
+        t.style.backgroundImage = `url("${img.src}")`;
+        if (Math.max(img.naturalWidth, img.naturalHeight) < 1000 && f.kind === "image" && !tried.has(name)) small.add(name);
+        markSmall();
         queue();
       };
+      t._img = img;
       img.src = src;
     } else {
       t.append(h("span", { class: "look-ext" }, f && f.kind === "video" ? "Video" : (name.split(".").pop() || "file").toUpperCase()));
@@ -172,6 +175,47 @@ export function lookPanel(code, album) {
     });
     tiles.set(name, t);
     return t;
+  }
+
+  // ----- sharper previews -----
+  // Galleries uploaded before previews were 1200px have small 480px ones, which look grainy in the big spots.
+  // This remakes them from the originals, one photo at a time.
+  const small = new Set(), tried = new Set(); // tried: remade already (a small original stays small)
+  const sharpenBtn = h("button", { type: "button", class: "btn btn-line small", hidden: true, onclick: sharpen });
+  function markSmall() {
+    if (sharpenBtn.disabled) return;
+    sharpenBtn.hidden = !small.size;
+    sharpenBtn.textContent = `Sharpen previews (${small.size} ${small.size === 1 ? "photo" : "photos"})`;
+  }
+  async function sharpen() {
+    const names = state.order.filter((n) => small.has(n));
+    sharpenBtn.disabled = true;
+    let done = 0, failed = 0;
+    for (const name of names) {
+      tried.add(name);
+      sharpenBtn.textContent = `Sharpening ${done + failed + 1} of ${names.length}…`;
+      try {
+        const got = await fetch(fileUrl(code, name), { credentials: "same-origin" });
+        if (got.status === 401) throw new Locked("Locked");
+        if (!got.ok) throw new Error(`Couldn't read ${name}.`);
+        const thumb = await makeThumb(await got.blob());
+        if (!thumb) throw new Error(`Couldn't make a preview of ${name}.`);
+        const put = await fetch(`/api/albums/${enc(code)}/thumbs/${enc(name)}`, {
+          method: "PUT", headers: { "x-studio": "1", "content-type": "image/jpeg" }, body: thumb, credentials: "same-origin" });
+        if (!put.ok) throw new Error(`Couldn't save the preview of ${name}.`);
+        small.delete(name);
+        const t = tiles.get(name);
+        if (t && t._img) t._img.src = `${fileUrl(code, name, true)}&s=${Date.now()}`;
+        done++;
+      } catch (e) {
+        if (e instanceof Locked) break;
+        failed++;
+      }
+    }
+    sharpenBtn.disabled = false;
+    if (failed) toast(`${failed} ${failed === 1 ? "preview" : "previews"} couldn't be sharpened. Try again.`, true);
+    else if (done) toast(`Sharpened ${done} ${done === 1 ? "preview" : "previews"}.`);
+    markSmall();
   }
 
   // The dragged photo takes the spot it was dropped on; the others shuffle along to make room.
@@ -235,7 +279,7 @@ export function lookPanel(code, album) {
     h("div", { class: "swatches" }, ...swatches, h("label", { class: "swatch custom" }, custom, h("small", {}, "Any colour"))),
     hexLine,
     h("div", { class: "head look-arrange-head" }, h("h3", {}, "Arrange the photos"),
-      h("div", { class: "row" }, ...sizeButtons, resetBtn)),
+      h("div", { class: "row" }, ...sizeButtons, resetBtn, sharpenBtn)),
     h("p", { class: "muted small" }, "Drag a photo onto a spot to put it there; the others move along. Or click a photo and use the arrow keys. Numbers show the order clients scroll through. New uploads go at the end."),
     stage);
 
